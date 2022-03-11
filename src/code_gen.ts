@@ -1,5 +1,4 @@
 
-
 import * as ts from "typescript";
 import * as ib from "./instruction_buffer.js";
 
@@ -61,6 +60,7 @@ export function compileProgram(fileNames: string[]): void {
 	let iBuff = new ib.InstructionBuffer();
 	sourceFiles.forEach(compileNode);
 	const outCode = iBuff.dumpBuffer();
+	let regMap = new Map<string, number>();
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {
@@ -80,6 +80,23 @@ export function compileProgram(fileNames: string[]): void {
 					console.log("unsupported expression type flags: " + typeFlags);
 				}
 				node.forEachChild(compileNode);
+				return new StatementCodeGenContext([]);
+
+			case ts.SyntaxKind.VariableStatement:
+				(node as ts.VariableStatement).declarationList.declarations.forEach(compileNode);
+				return new StatementCodeGenContext([]);
+
+			case ts.SyntaxKind.VariableDeclaration:
+				let varDec = node as ts.VariableDeclaration;
+				if (varDec.initializer) {
+					let expCtx = compileNode(varDec.initializer) as ExpressionCodeGenContext;
+					if (expCtx.isValueSaved) {
+						regMap.set(varDec.name.getText(), (expCtx as SavedExpressionCodeGenContext).reg);
+					}
+					else {
+						//TODO: save bool value if necessary
+					}
+				}
 				return new StatementCodeGenContext([]);
 
 			case ts.SyntaxKind.SourceFile:

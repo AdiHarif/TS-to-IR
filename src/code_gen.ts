@@ -24,10 +24,10 @@ class SavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 	readonly isValueSaved: boolean = true;
 
 	public typeFlags: ts.TypeFlags;
-	public registerIndex: number = -1;
+	public reg: number = -1;
 
-	constructor(registerIndex: number, typeFlags: ts.TypeFlags) {
-		this.registerIndex = registerIndex;
+	constructor(reg: number, typeFlags: ts.TypeFlags) {
+		this.reg = reg;
 		this.typeFlags = typeFlags;
 
 	}
@@ -53,7 +53,7 @@ export function compileProgram(fileNames: string[]): void {
 	const options: ts.CompilerOptions = {
 	};
 	const program = ts.createProgram(fileNames, options); //TODO: add compiler options handling
-	let sourceFiles: ts.SourceFile[] = getSourceFiles();
+	let sourceFiles = getSourceFiles();
 	//TODO: check if the programs syntax\semantics are ok
 
 
@@ -64,13 +64,20 @@ export function compileProgram(fileNames: string[]): void {
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {
-			// case ts.SyntaxKind.ExpressionStatement:
-			// 	compileNode((node as ts.ExpressionStatement).expression);
-			// 	return new StatementCodeGenContext([]);
-			// case ts.SyntaxKind.BinaryExpression:
-			// 	console.log("node text: " + node.getText() + ", type: " + checker.getTypeAtLocation(node).flags);
-			// 	node.forEachChild(compileNode);
-			// 	return new StatementCodeGenContext([]);
+			case ts.SyntaxKind.ParenthesizedExpression:
+				return compileNode((node as ts.ParenthesizedExpression).expression);
+
+			case ts.SyntaxKind.ExpressionStatement:
+				compileNode((node as ts.ExpressionStatement).expression); //TODO: make sure there is nothing to do with the return value
+				return new StatementCodeGenContext([]);
+
+			case ts.SyntaxKind.BinaryExpression:
+				const typeFlags = checker.getTypeAtLocation(node).flags;
+				if (typeFlags & ts.TypeFlags.Number){
+					return emitNumericBinaryExpression(node as ts.BinaryExpression);
+				}
+				node.forEachChild(compileNode);
+				return new StatementCodeGenContext([]);
 
 			case ts.SyntaxKind.SourceFile:
 				//TODO: implement adding main function with script statements (outside functions)
@@ -131,5 +138,13 @@ export function compileProgram(fileNames: string[]): void {
 		signature.parameters.forEach(paramSymbol => paramTypes.push(getSymbolTypeFlags(paramSymbol)));
 		const id = fun.name!.getText();
 		iBuff.emit(new ib.FunctionDeclarationInstruction(id, retType, paramTypes));
+	}
+
+	function emitNumericBinaryExpression(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {
+		const leftCtx = compileNode(exp.left) as SavedExpressionCodeGenContext;
+		const rightCtx = compileNode(exp.right) as SavedExpressionCodeGenContext;
+		const resReg = iBuff.getNewReg();
+		iBuff.emit(new ib.NumericInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+		return new SavedExpressionCodeGenContext(resReg, ts.TypeFlags.Number);
 	}
 }

@@ -25,6 +25,23 @@ export class FunctionDeclarationInstruction implements Instruction {
 	}
 }
 
+export class NumericInstruction implements Instruction {
+	private resReg: number;
+	private leftReg: number;
+	private rightReg: number;
+	private op: ts.BinaryOperator;
+
+	constructor(resReg: number, leftReg: number, rightReg: number, op: ts.BinaryOperator) {
+		this.resReg = resReg;
+		this.leftReg = leftReg;
+		this.rightReg = rightReg;
+		this.op = op; //TODO: check that op is of supported token
+	}
+
+	toLlvm(): string {
+		return ""; //TODO: implement
+	}
+}
 class LabelInstruction implements Instruction {
 	private static count = 0;
 
@@ -55,6 +72,7 @@ class JumpInstruction implements PatchableInstruction {
 export class InstructionBuffer {
 	private codeBuffer: Instruction[] = [];
 	private dataBuffer: Instruction[] = [];
+	private regCount: number = 0;
 
 	constructor() {}
 
@@ -77,6 +95,10 @@ export class InstructionBuffer {
 	emitNewJump(): number {
 		const jump = new JumpInstruction();
 		return this.emit(jump);
+	}
+
+	getNewReg(): number {
+		return this.regCount++;
 	}
 
 	backPatch(locations: number[], label: number) {

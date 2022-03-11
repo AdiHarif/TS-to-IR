@@ -1,6 +1,23 @@
 
 import * as ts from "typescript";
 
+function typeFlagsToLlvmType(typeFlags: ts.TypeFlags): string {
+	if (typeFlags & ts.TypeFlags.Void) {
+		return 'void';
+	}
+	if (typeFlags & ts.TypeFlags.Number) {
+		return 'double';
+	}
+	if (typeFlags & ts.TypeFlags.Boolean) {
+		return 'i1';
+	}
+	return 'unsupported-type';
+}
+
+function regIndexToString(reg: number): string {
+	return '%r' + reg.toString();
+}
+
 interface Instruction {
 	toLlvm(): string;
 }
@@ -39,7 +56,24 @@ export class NumericInstruction implements Instruction {
 	}
 
 	toLlvm(): string {
-		return ""; //TODO: implement
+		let llvmOp: string;
+		switch (this.op) {
+			case ts.SyntaxKind.PlusToken:
+				llvmOp = "fadd";
+				break;
+			case ts.SyntaxKind.MinusToken:
+				llvmOp = "fsub";
+				break;
+			case ts.SyntaxKind.AsteriskToken:
+				llvmOp = "fmul";
+				break;
+			case ts.SyntaxKind.SlashToken:
+				llvmOp = "fdiv";
+				break;
+			default:
+				llvmOp = "unsupported-op";
+		}
+		return regIndexToString(this.resReg) + " = " + llvmOp + " " + typeFlagsToLlvmType(ts.TypeFlags.Number) + " " + regIndexToString(this.leftReg) + ", " +  regIndexToString(this.rightReg);
 	}
 }
 
@@ -55,7 +89,11 @@ export class ReturnInstruction implements Instruction {
 	}
 
 	toLlvm(): string {
-		return ""; //TODO: implement
+		let out = "ret " + typeFlagsToLlvmType(this.typeFlags);
+		if (this.typeFlags & ts.TypeFlags.Void) {
+			out += ' ' + regIndexToString(this.reg);
+		}
+		return out;
 	}
 }
 

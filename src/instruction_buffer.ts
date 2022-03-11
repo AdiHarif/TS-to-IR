@@ -42,6 +42,23 @@ export class NumericInstruction implements Instruction {
 		return ""; //TODO: implement
 	}
 }
+
+export class ReturnInstruction implements Instruction {
+	private typeFlags: ts.TypeFlags;
+	private reg: number = -1;
+
+	constructor(typeFlags: ts.TypeFlags, reg?: number) {
+		this.typeFlags = typeFlags;
+		if (reg) {
+			this.reg = reg;
+		}
+	}
+
+	toLlvm(): string {
+		return ""; //TODO: implement
+	}
+}
+
 class LabelInstruction implements Instruction {
 	private static count = 0;
 

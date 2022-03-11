@@ -101,6 +101,27 @@ export function compileProgram(fileNames: string[]): void {
 				}
 				return new StatementCodeGenContext([]);
 
+			case ts.SyntaxKind.ReturnStatement:
+				const retStat = node as ts.ReturnStatement;
+				let retInst: ib.ReturnInstruction;
+				if (retStat.expression) {
+					const expCtx = compileNode(retStat.expression) as ExpressionCodeGenContext;
+					let retReg: number = -1;
+					if (!expCtx.isValueSaved) {
+						//TODO: save exp value
+					}
+					else {
+						retReg = (expCtx as SavedExpressionCodeGenContext).reg;
+					}
+					let retType = checker.getTypeAtLocation(retStat.expression).flags;
+					retInst = new ib.ReturnInstruction(retType, retReg);
+				}
+				else {
+					retInst = new ib.ReturnInstruction(ts.TypeFlags.Void);
+				}
+				iBuff.emit(retInst);
+				return new StatementCodeGenContext([]);
+
 			case ts.SyntaxKind.SourceFile:
 				//TODO: implement adding main function with script statements (outside functions)
 			case ts.SyntaxKind.Block:

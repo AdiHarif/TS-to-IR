@@ -1,23 +1,13 @@
 
-import { assert } from "console";
-import { EWOULDBLOCK } from "constants";
-import { emit } from "process";
+
 import * as ts from "typescript";
 import * as ib from "./instruction_buffer.js";
 
-interface BackPatchContext {
-	concat(ctx: BackPatchContext): void;
-}
-
-class StatementsBackPatchContext implements BackPatchContext {
+class StatementCodeGenContext {
 	public nextList: number[] = [];
 
 	constructor(nextList: number[]) {
 		this.nextList = nextList;
-	}
-
-	concat(ctx: StatementsBackPatchContext): void {
-		this.nextList.concat(ctx.nextList);
 	}
 
 	isEmpty(): boolean {
@@ -25,20 +15,39 @@ class StatementsBackPatchContext implements BackPatchContext {
 	}
 }
 
-// class ExpressionBackPatchContext implements BackPatchContext {
-// 	public trueList: number[] = [];
-// 	public falseList: number[] = [];
+interface ExpressionCodeGenContext  {
+	isValueSaved: boolean;
+	typeFlags: ts.TypeFlags;
+}
 
-// 	constructor(trueList: number[], falseList: number[]) {
-// 		this.trueList = trueList;
-// 		this.falseList = falseList;
-// 	}
+class SavedExpressionCodeGenContext implements ExpressionCodeGenContext {
+	readonly isValueSaved: boolean = true;
 
-// 	concat(ctx: ExpressionBackPatchContext): void {
-// 		this.trueList.concat(ctx.trueList);
-// 		this.falseList.concat(ctx.falseList);
-// 	}
-// }
+	public typeFlags: ts.TypeFlags;
+	public registerIndex: number = -1;
+
+	constructor(registerIndex: number, typeFlags: ts.TypeFlags) {
+		this.registerIndex = registerIndex;
+		this.typeFlags = typeFlags;
+
+	}
+}
+
+class UnsavedExpressionCodeGen implements ExpressionCodeGenContext {
+	readonly isValueSaved: boolean = false;
+	readonly typeFlags: ts.TypeFlags = ts.TypeFlags.Boolean;
+
+	public trueList: number[] = [];
+	public falseList: number[] = [];
+
+	constructor(trueList: number[], falseList: number[]) {
+		this.trueList = trueList;
+		this.falseList = falseList;
+	}
+
+}
+
+type CodeGenContext = StatementCodeGenContext | ExpressionCodeGenContext;
 
 export function compileProgram(fileNames: string[]): void {
 	const options: ts.CompilerOptions = {
@@ -53,17 +62,26 @@ export function compileProgram(fileNames: string[]): void {
 	sourceFiles.forEach(compileNode);
 	const outCode = iBuff.dumpBuffer();
 
-	function compileNode(node: ts.Node): BackPatchContext {
+	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {
-			case ts.SyntaxKind.Block:
+			// case ts.SyntaxKind.ExpressionStatement:
+			// 	compileNode((node as ts.ExpressionStatement).expression);
+			// 	return new StatementCodeGenContext([]);
+			// case ts.SyntaxKind.BinaryExpression:
+			// 	console.log("node text: " + node.getText() + ", type: " + checker.getTypeAtLocation(node).flags);
+			// 	node.forEachChild(compileNode);
+			// 	return new StatementCodeGenContext([]);
+
 			case ts.SyntaxKind.SourceFile:
-				let bpCtx = new StatementsBackPatchContext([]);
+				//TODO: implement adding main function with script statements (outside functions)
+			case ts.SyntaxKind.Block:
+				let bpCtx = new StatementCodeGenContext([]);
 				(node as ts.BlockLike).statements.forEach(statement => {
 					if (!bpCtx.isEmpty()){
 						const label = iBuff.emitNewLabel();
 						iBuff.backPatch(bpCtx.nextList, label)
 					}
-					bpCtx = compileNode(statement)! as StatementsBackPatchContext;
+					bpCtx = compileNode(statement) as StatementCodeGenContext;
 				});
 				return bpCtx;
 
@@ -71,7 +89,7 @@ export function compileProgram(fileNames: string[]): void {
 				const fun = node as ts.FunctionDeclaration;
 				emitFunctionDeclaration(fun);
 				compileNode(fun.body!);
-				return new StatementsBackPatchContext([]);
+				return new StatementCodeGenContext([]);
 
 			// case ts.SyntaxKind.IfStatement:
 			// 	const ifStat = node as ts.IfStatement;
@@ -90,7 +108,10 @@ export function compileProgram(fileNames: string[]): void {
 			// 	}
 
 			default:
-				throw new Error("unsupported node kind: " + ts.SyntaxKind[node.kind]);
+				//throw new Error("unsupported node kind: " + ts.SyntaxKind[node.kind]);
+				console.log("unsupported node kind: " + ts.SyntaxKind[node.kind]);
+				node.forEachChild(compileNode);
+				return new StatementCodeGenContext([]);
 		}
 	}
 

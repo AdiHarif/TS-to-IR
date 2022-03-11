@@ -76,6 +76,9 @@ export function compileProgram(fileNames: string[]): void {
 				if (typeFlags & ts.TypeFlags.Number){
 					return emitNumericBinaryExpression(node as ts.BinaryExpression);
 				}
+				else {
+					console.log("unsupported expression type flags: " + typeFlags);
+				}
 				node.forEachChild(compileNode);
 				return new StatementCodeGenContext([]);
 

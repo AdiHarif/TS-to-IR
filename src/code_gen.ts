@@ -61,6 +61,11 @@ export function compileProgram(fileNames: string[]): void {
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {
+			case ts.SyntaxKind.Identifier:
+				const id = node as ts.Identifier;
+				const reg = regMap.get(id.text);
+				return new SavedExpressionCodeGenContext(reg!);
+
 			case ts.SyntaxKind.ParenthesizedExpression:
 				return compileNode((node as ts.ParenthesizedExpression).expression);
 

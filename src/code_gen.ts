@@ -16,19 +16,15 @@ class StatementCodeGenContext {
 
 interface ExpressionCodeGenContext  {
 	isValueSaved: boolean;
-	typeFlags: ts.TypeFlags;
 }
 
 class SavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 	readonly isValueSaved: boolean = true;
 
-	public typeFlags: ts.TypeFlags;
 	public reg: number = -1;
 
-	constructor(reg: number, typeFlags: ts.TypeFlags) {
+	constructor(reg: number) {
 		this.reg = reg;
-		this.typeFlags = typeFlags;
-
 	}
 }
 
@@ -166,6 +162,6 @@ export function compileProgram(fileNames: string[]): void {
 		const rightCtx = compileNode(exp.right) as SavedExpressionCodeGenContext;
 		const resReg = iBuff.getNewReg();
 		iBuff.emit(new ib.NumericInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
-		return new SavedExpressionCodeGenContext(resReg, ts.TypeFlags.Number);
+		return new SavedExpressionCodeGenContext(resReg);
 	}
 }

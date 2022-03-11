@@ -58,9 +58,10 @@ export function compileProgram(fileNames: string[]): void {
 
 	const checker = program.getTypeChecker();
 	let iBuff = new ib.InstructionBuffer();
+	let regMap = new Map<string, number>();
+
 	sourceFiles.forEach(compileNode);
 	const outCode = iBuff.dumpBuffer();
-	let regMap = new Map<string, number>();
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {

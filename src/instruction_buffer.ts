@@ -100,6 +100,51 @@ export class ReturnInstruction implements Instruction {
 	}
 }
 
+export type TypedReg = {
+	reg: number;
+	typeFlags: ts.TypeFlags;
+}
+
+export class FunctionCallInstruction implements Instruction {
+	private resReg: TypedReg;
+	private name: string;
+	private paramRegs: TypedReg[];
+
+	constructor(resReg: TypedReg, name: string, paramRegs: TypedReg[]) {
+		this.resReg = resReg;
+		this.name = name;
+		this.paramRegs = paramRegs;
+	}
+
+	toLlvm(): string {
+		let out = "";
+		if (!(this.resReg.typeFlags & ts.TypeFlags.Void)) {
+			out += regIndexToString(this.resReg.reg) + " = ";
+		}
+		out += "call " + typeFlagsToLlvmType(this.resReg.typeFlags);
+		if (this.paramRegs.length != 0) {
+			out += " (";
+			for (let i = 0; i < this.paramRegs.length; i++) {
+				if (i != 0) {
+					out += ", ";
+				}
+				out += typeFlagsToLlvmType(this.paramRegs[i].typeFlags);
+			}
+			out += ")";
+		}
+		out += " @" + this.name + "(";
+		for (let i = 0; i < this.paramRegs.length; i++) {
+			if (i != 0) {
+				out += ", ";
+			}
+			const typedReg = this.paramRegs[i];
+			out += typeFlagsToLlvmType(typedReg.typeFlags) + " " + regIndexToString(typedReg.reg);
+		}
+		out += ")";
+		return out;
+	}
+}
+
 class LabelInstruction implements Instruction {
 	private static count = 0;
 
@@ -130,6 +175,7 @@ class JumpInstruction implements PatchableInstruction {
 export class InstructionBuffer {
 	private codeBuffer: Instruction[] = [];
 	private dataBuffer: Instruction[] = [];
+	private globalCodeBuffer: Instruction[] = [];
 	private regCount: number = 0;
 
 	constructor() {}

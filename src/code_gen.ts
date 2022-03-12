@@ -86,6 +86,40 @@ export function compileProgram(fileNames: string[]): void {
 				node.forEachChild(compileNode);
 				return new StatementCodeGenContext([]);
 
+			case ts.SyntaxKind.CallExpression:
+				let callExp = node as ts.CallExpression;
+				let funcName = "";
+				let retType = ts.TypeFlags.Unknown;
+				if (callExp.expression.kind == ts.SyntaxKind.Identifier) {
+					funcName = (callExp.expression as ts.Identifier).text;
+					retType = checker.getTypeAtLocation(callExp).flags;
+				}
+				else if (callExp.expression.kind == ts.SyntaxKind.PropertyAccessExpression &&
+					 callExp.expression.getText() == "console.log") {
+
+					retType = ts.TypeFlags.Void;
+					//TODO: handle multiple arguments and other argument types
+					let argType = checker.getTypeAtLocation(callExp.arguments[0]).flags;
+					if (argType & ts.TypeFlags.String) {
+						funcName = "prints";
+					}
+					if (argType & ts.TypeFlags.Number) {
+						funcName = "printd";
+					}
+				}
+				else {
+					console.log("unsupported PropertyAccessExpression: " + callExp.expression.getText());
+				}
+
+				let paramRegs: ib.TypedReg[] = [];
+				callExp.arguments.forEach(exp => {
+					const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
+					paramRegs.push({
+						reg: expCtx.reg, typeFlags: checker.getTypeAtLocation(exp).flags
+					});
+				});
+				return emitFunctionCall(retType, funcName, paramRegs);
+
 			case ts.SyntaxKind.VariableStatement:
 				(node as ts.VariableStatement).declarationList.declarations.forEach(compileNode);
 				return new StatementCodeGenContext([]);
@@ -195,5 +229,14 @@ export function compileProgram(fileNames: string[]): void {
 		const resReg = iBuff.getNewReg();
 		iBuff.emit(new ib.NumericInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
 		return new SavedExpressionCodeGenContext(resReg);
+	}
+
+	function emitFunctionCall(retType: ts.TypeFlags, name: string, paramRegs: ib.TypedReg[]): SavedExpressionCodeGenContext {
+		const retReg: ib.TypedReg = {
+			reg: iBuff.getNewReg(),
+			typeFlags: retType
+		};
+		iBuff.emit(new ib.FunctionCallInstruction(retReg, name, paramRegs));
+		return new SavedExpressionCodeGenContext(retReg.reg);
 	}
 }

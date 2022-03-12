@@ -41,7 +41,21 @@ export class FunctionDeclarationInstruction implements Instruction {
 	}
 
 	toLlvm(): string {
-		return ""; //TODO: implement
+		let out = "define " + typeFlagsToLlvmType(this.retType) + " @" + this.id + "(";
+		for (let i = 0; i < this.paramTypes.length; i++) {
+			if (i != 0) {
+				out += ", ";
+			}
+			out += typeFlagsToLlvmType(this.paramTypes[i]);
+		}
+		out += ") {";
+		return out;
+	}
+}
+
+export class FunctionEndInstruction implements Instruction {
+	toLlvm(): string {
+		return "}\n";
 	}
 }
 
@@ -213,7 +227,8 @@ export class InstructionBuffer {
 		let code: string = "";
 		this.dataBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
 		this.codeBuffer.forEach(instruction => {
-			if (!(instruction instanceof FunctionDeclarationInstruction)) {
+			if (!((instruction instanceof FunctionDeclarationInstruction) || 
+			      (instruction instanceof FunctionEndInstruction))) {
 				code += "\t";
 			}
 			code += instruction.toLlvm() + '\n'

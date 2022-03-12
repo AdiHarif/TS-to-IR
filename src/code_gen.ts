@@ -175,6 +175,7 @@ export function compileProgram(fileNames: string[]): void {
 				const fun = node as ts.FunctionDeclaration;
 				emitFunctionDeclaration(fun);
 				compileNode(fun.body!);
+				iBuff.emit(new ib.FunctionEndInstruction());
 				return new StatementCodeGenContext([]);
 
 			// case ts.SyntaxKind.IfStatement:

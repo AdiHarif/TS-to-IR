@@ -15,6 +15,9 @@ function typeFlagsToLlvmType(typeFlags: ts.TypeFlags): string {
 }
 
 function regIndexToString(reg: number): string {
+	if (reg < 0) { //i.e. this is a function variable
+		return '%' + (-1 - reg).toString();
+	}
 	return '%r' + reg.toString();
 }
 
@@ -79,7 +82,7 @@ export class NumericInstruction implements Instruction {
 
 export class ReturnInstruction implements Instruction {
 	private typeFlags: ts.TypeFlags;
-	private reg: number = -1;
+	private reg: number = 0;
 
 	constructor(typeFlags: ts.TypeFlags, reg?: number) {
 		this.typeFlags = typeFlags;
@@ -153,7 +156,7 @@ export class InstructionBuffer {
 	}
 
 	getNewReg(): number {
-		return this.regCount++;
+		return ++this.regCount;
 	}
 
 	backPatch(locations: number[], label: number) {

@@ -21,7 +21,7 @@ interface ExpressionCodeGenContext  {
 class SavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 	readonly isValueSaved: boolean = true;
 
-	public reg: number = -1;
+	public reg: number;
 
 	constructor(reg: number) {
 		this.reg = reg;
@@ -57,7 +57,9 @@ export function compileProgram(fileNames: string[]): void {
 	let regMap = new Map<string, number>();
 
 	sourceFiles.forEach(compileNode);
+
 	const outCode = iBuff.dumpBuffer();
+	console.log(outCode);
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {
@@ -106,9 +108,9 @@ export function compileProgram(fileNames: string[]): void {
 				let retInst: ib.ReturnInstruction;
 				if (retStat.expression) {
 					const expCtx = compileNode(retStat.expression) as ExpressionCodeGenContext;
-					let retReg: number = -1;
+					let retReg: number;
 					if (!expCtx.isValueSaved) {
-						//TODO: save exp value
+						retReg = 0;//TODO: save exp value
 					}
 					else {
 						retReg = (expCtx as SavedExpressionCodeGenContext).reg;
@@ -178,7 +180,11 @@ export function compileProgram(fileNames: string[]): void {
 		const signature = checker.getSignatureFromDeclaration(fun)!;
 		const retType = checker.getReturnTypeOfSignature(signature).flags;
 		let paramTypes: ts.TypeFlags[] = [];
-		signature.parameters.forEach(paramSymbol => paramTypes.push(getSymbolTypeFlags(paramSymbol)));
+		for (let i = 0; i < signature.parameters.length; i++) {
+			const paramSymbol = signature.parameters[i];
+			regMap.set(paramSymbol.getName(), -(i + 1));
+			paramTypes.push(getSymbolTypeFlags(paramSymbol));
+		}
 		const id = fun.name!.getText();
 		iBuff.emit(new ib.FunctionDeclarationInstruction(id, retType, paramTypes));
 	}

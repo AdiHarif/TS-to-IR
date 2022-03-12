@@ -166,7 +166,12 @@ export class InstructionBuffer {
 	dumpBuffer(): string {
 		let code: string = "";
 		this.dataBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
-		this.codeBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
+		this.codeBuffer.forEach(instruction => {
+			if (instruction instanceof FunctionDeclarationInstruction) {
+				code += "\t";
+			}
+			code += instruction.toLlvm() + '\n'
+		});
 		return code;
 	}
 

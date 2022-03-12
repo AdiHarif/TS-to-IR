@@ -93,7 +93,7 @@ export class ReturnInstruction implements Instruction {
 
 	toLlvm(): string {
 		let out = "ret " + typeFlagsToLlvmType(this.typeFlags);
-		if (this.typeFlags & ts.TypeFlags.Void) {
+		if (!(this.typeFlags & ts.TypeFlags.Void)) {
 			out += ' ' + regIndexToString(this.reg);
 		}
 		return out;

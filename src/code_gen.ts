@@ -1,4 +1,5 @@
 
+import { assert } from "console";
 import * as ts from "typescript";
 import * as ib from "./instruction_buffer.js";
 
@@ -43,6 +44,10 @@ class UnsavedExpressionCodeGen implements ExpressionCodeGenContext {
 }
 
 type CodeGenContext = StatementCodeGenContext | ExpressionCodeGenContext;
+
+const libFunctions = [ //TODO: add printf and remove handling console.log
+	"scanf"
+];
 
 export function compileProgram(fileNames: string[]): void {
 	const options: ts.CompilerOptions = {
@@ -90,6 +95,7 @@ export function compileProgram(fileNames: string[]): void {
 				let callExp = node as ts.CallExpression;
 				let funcName = "";
 				let retType = ts.TypeFlags.Unknown;
+				//TODO: remove handling console.log and replace with printf
 				if (callExp.expression.kind == ts.SyntaxKind.Identifier) {
 					funcName = (callExp.expression as ts.Identifier).text;
 					retType = checker.getTypeAtLocation(callExp).flags;
@@ -111,6 +117,10 @@ export function compileProgram(fileNames: string[]): void {
 					console.log("unsupported PropertyAccessExpression: " + callExp.expression.getText());
 				}
 
+				if (libFunctions.indexOf(funcName) > -1) {
+					return emitLibFuncitonCall(callExp);
+				}
+
 				let paramRegs: ib.TypedReg[] = [];
 				callExp.arguments.forEach(exp => {
 					const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
@@ -118,6 +128,7 @@ export function compileProgram(fileNames: string[]): void {
 						reg: expCtx.reg, typeFlags: checker.getTypeAtLocation(exp).flags
 					});
 				});
+
 				return emitFunctionCall(retType, funcName, paramRegs);
 
 			case ts.SyntaxKind.VariableStatement:
@@ -233,11 +244,46 @@ export function compileProgram(fileNames: string[]): void {
 	}
 
 	function emitFunctionCall(retType: ts.TypeFlags, name: string, paramRegs: ib.TypedReg[]): SavedExpressionCodeGenContext {
+		//TODO: remove allocating new reg for void functions
 		const retReg: ib.TypedReg = {
 			reg: iBuff.getNewReg(),
 			typeFlags: retType
 		};
 		iBuff.emit(new ib.FunctionCallInstruction(retReg, name, paramRegs));
 		return new SavedExpressionCodeGenContext(retReg.reg);
+	}
+
+	function emitLibFuncitonCall(funCall: ts.CallExpression): SavedExpressionCodeGenContext {
+		const funName = (funCall.expression as ts.Identifier).getText();
+		const args = funCall.arguments;
+		let llvmFunName = "";
+		let llvmRetType = ts.TypeFlags.Void;
+		let llvmArgs: ib.TypedReg[] = [];
+		switch (funName){
+			case "scanf":
+				assert(args.length == 1);
+				const format = args[0].getText();
+				switch (format) {
+					case '\"%f\"':
+					case '\"%lf\"':
+					case '\"%d\"':
+						llvmFunName = "scand";
+						llvmRetType = ts.TypeFlags.Number
+						break;
+					default:
+						throw new Error("unsupported scanf format: " + format);
+				}
+				break;
+			default:
+				throw new Error("")
+		}
+
+		//TODO: remove allocating new reg for void functions
+		const llvmRetReg: ib.TypedReg = {
+			reg: iBuff.getNewReg(),
+			typeFlags: llvmRetType
+		};
+		iBuff.emit(new ib.FunctionCallInstruction(llvmRetReg, llvmFunName, llvmArgs));
+		return new SavedExpressionCodeGenContext(llvmRetReg.reg);
 	}
 }

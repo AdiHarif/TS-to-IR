@@ -3,12 +3,6 @@ declare i32 @scanf(i8*, ...)
 
 @.double_specifier = constant [4 x i8] c"%lf\00"
 
-define void @printd(double) {
-	%spec_ptr = getelementptr [4 x i8], [4 x i8]* @.write_specifier, i32 0, i32 0
-	call i32 (i8*, ...) @printf(i8* %spec_ptr, double %0)
-	ret void
-}
-
 define double @scand() {
 	%spec_ptr = getelementptr [4 x i8], [4 x i8]* @.read_specifier, i32 0, i32 0
 	%in_ptr = alloca double

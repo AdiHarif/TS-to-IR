@@ -68,6 +68,9 @@ export function compileProgram(fileNames: string[]): void {
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {
+			case ts.SyntaxKind.ImportDeclaration:
+				return new StatementCodeGenContext([]);
+
 			case ts.SyntaxKind.Identifier:
 				const id = node as ts.Identifier;
 				const reg = regMap.get(id.text);

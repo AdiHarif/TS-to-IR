@@ -76,6 +76,12 @@ export function compileProgram(fileNames: string[]): void {
 				const reg = regMap.get(id.text);
 				return new SavedExpressionCodeGenContext(reg!);
 
+			case ts.SyntaxKind.NumericLiteral:
+				// ? TODO: return the constant value as context instead of saving it to register
+				const val = parseInt(node.getText()); //TODO: support bases other than decimal
+				return emitSaveNumericValue(val);
+
+
 			case ts.SyntaxKind.ParenthesizedExpression:
 				return compileNode((node as ts.ParenthesizedExpression).expression);
 
@@ -242,7 +248,7 @@ export function compileProgram(fileNames: string[]): void {
 		const leftCtx = compileNode(exp.left) as SavedExpressionCodeGenContext;
 		const rightCtx = compileNode(exp.right) as SavedExpressionCodeGenContext;
 		const resReg = iBuff.getNewReg();
-		iBuff.emit(new ib.NumericInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+		iBuff.emit(new ib.NumericOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
 		return new SavedExpressionCodeGenContext(resReg);
 	}
 
@@ -288,5 +294,11 @@ export function compileProgram(fileNames: string[]): void {
 		};
 		iBuff.emit(new ib.FunctionCallInstruction(llvmRetReg, llvmFunName, llvmArgs));
 		return new SavedExpressionCodeGenContext(llvmRetReg.reg);
+	}
+
+	function emitSaveNumericValue(val: number): SavedExpressionCodeGenContext {
+		const reg = iBuff.getNewReg();
+		iBuff.emit(new ib.NumericAssignmentInstruction(reg, val));
+		return new SavedExpressionCodeGenContext(reg);
 	}
 }

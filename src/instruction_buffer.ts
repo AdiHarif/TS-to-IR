@@ -59,7 +59,21 @@ export class FunctionEndInstruction implements Instruction {
 	}
 }
 
-export class NumericInstruction implements Instruction {
+export class NumericAssignmentInstruction implements Instruction {
+	private reg: number;
+	private val: number;
+
+	constructor(reg: number, val: number) {
+		this.reg = reg;
+		this.val = val;
+	}
+
+	toLlvm(): string {
+		return regIndexToString(this.reg) + " = fadd double 0, " + this.val;
+	}
+}
+
+export class NumericOpInstruction implements Instruction {
 	private resReg: number;
 	private leftReg: number;
 	private rightReg: number;

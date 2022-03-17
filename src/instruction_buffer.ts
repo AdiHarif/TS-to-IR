@@ -5,13 +5,14 @@ function typeFlagsToLlvmType(typeFlags: ts.TypeFlags): string {
 	if (typeFlags & ts.TypeFlags.Void) {
 		return 'void';
 	}
-	if (typeFlags & ts.TypeFlags.Number) {
+	if ((typeFlags & ts.TypeFlags.Number) ||
+	    (typeFlags & ts.TypeFlags.NumberLiteral)) {
 		return 'double';
 	}
 	if (typeFlags & ts.TypeFlags.Boolean) {
 		return 'i1';
 	}
-	return 'unsupported-type';
+	return 'unsupported-type(' + ts.TypeFlags[typeFlags] + ')';
 }
 
 function regIndexToString(reg: number): string {

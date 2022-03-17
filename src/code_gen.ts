@@ -133,8 +133,12 @@ export function compileProgram(fileNames: string[]): void {
 				let paramRegs: ib.TypedReg[] = [];
 				callExp.arguments.forEach(exp => {
 					const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
+					let argType = checker.getTypeAtLocation(exp).flags;
+					if (argType == ts.TypeFlags.Any) {
+						argType = checker.getContextualType(exp)!.flags;
+					}
 					paramRegs.push({
-						reg: expCtx.reg, typeFlags: checker.getTypeAtLocation(exp).flags
+						reg: expCtx.reg, typeFlags: argType
 					});
 				});
 

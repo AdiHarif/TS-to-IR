@@ -5,7 +5,6 @@ function add(x: number, y: number): number {
 	let z = x + y;
 	return z;
 }
-function main(): number {
+function main(): void {
 	console.log(add(scanf("%f"), scanf("%f")));
-	return 0;
 }

@@ -70,7 +70,11 @@ export class NumericAssignmentInstruction implements Instruction {
 	}
 
 	toLlvm(): string {
-		return regIndexToString(this.reg) + " = fadd double 0, " + this.val;
+		let llvm_val: string = this.val.toString();
+		if (Number.isInteger(this.val)) {
+			llvm_val += ".0";
+		}
+		return regIndexToString(this.reg) + " = fadd double 0.0, " + llvm_val;
 	}
 }
 

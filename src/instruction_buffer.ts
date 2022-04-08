@@ -243,10 +243,17 @@ export class InstructionBuffer {
 	}
 
 	dumpBuffer(): string {
-		let code: string = "";
+		//TODO: change handling declerations in a more dynamic way
+		const declerations: string = (
+			'declare double @scand()\n' +
+			'declare void @printd(double)\n' +
+			'declare void @prints(i8*)\n' +
+			'\n'
+		);
+		let code: string = declerations;
 		this.dataBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
 		this.codeBuffer.forEach(instruction => {
-			if (!((instruction instanceof FunctionDeclarationInstruction) || 
+			if (!((instruction instanceof FunctionDeclarationInstruction) ||
 			      (instruction instanceof FunctionEndInstruction))) {
 				code += "\t";
 			}

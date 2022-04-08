@@ -199,6 +199,12 @@ export function compileProgram(fileNames: string[]): void {
 				const fun = node as ts.FunctionDeclaration;
 				emitFunctionDeclaration(fun);
 				compileNode(fun.body!);
+
+				//TODO: make this if more readable
+				if ( checker.getReturnTypeOfSignature(checker.getSignatureFromDeclaration(fun)!).flags & ts.TypeFlags.Void) {
+					iBuff.emit(new ib.ReturnInstruction(ts.TypeFlags.Void));
+				}
+
 				iBuff.emit(new ib.FunctionEndInstruction());
 				return new StatementCodeGenContext([]);
 

@@ -7,7 +7,8 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "pretest": "npm run build",
+    "test": "scripts/run_tests.sh",
     "build": "tsc",
     "prestart": "npm run build",
     "start": "node build/app.js"

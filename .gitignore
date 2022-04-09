@@ -106,3 +106,7 @@ dist
 build/
 misc/
 .vscode/
+
+# Test tmp files
+tests/**/*.llvm
+tests/**/*.res

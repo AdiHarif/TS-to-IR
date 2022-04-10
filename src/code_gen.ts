@@ -29,7 +29,7 @@ class SavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 	}
 }
 
-class UnsavedExpressionCodeGen implements ExpressionCodeGenContext {
+class UnsavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 	readonly isValueSaved: boolean = false;
 	readonly typeFlags: ts.TypeFlags = ts.TypeFlags.Boolean;
 
@@ -208,21 +208,23 @@ export function compileProgram(fileNames: string[]): void {
 				iBuff.emit(new ib.FunctionEndInstruction());
 				return new StatementCodeGenContext([]);
 
-			// case ts.SyntaxKind.IfStatement:
-			// 	const ifStat = node as ts.IfStatement;
-			// 	const expBpCtx = compileNode(ifStat.expression) as ExpressionBackPatchContext; //TODO: handle cases where the expression is an identifier/constant value
-			// 	const trueLabel = iBuff.emitNewLabel();
-			// 	iBuff.backPatch(expBpCtx.trueList, trueLabel);
-			// 	const thenBpCtx = compileNode(ifStat.thenStatement) as StatementsBackPatchContext;
-			// 	if (ifStat.elseStatement){
-			// 		const falseLabel =iBuff.emitNewLabel();
-			// 		iBuff.backPatch(expBpCtx.falseList, falseLabel);
-			// 		const elseBpCtx = compileNode(ifStat.elseStatement) as StatementsBackPatchContext;
-			// 		return new StatementsBackPatchContext(elseBpCtx.nextList.concat(thenBpCtx.nextList));
-			// 	}
-			// 	else { //no else statement
-			// 		return new StatementsBackPatchContext(expBpCtx.falseList.concat(thenBpCtx.nextList));
-			// 	}
+			case ts.SyntaxKind.IfStatement:
+				const ifStat = node as ts.IfStatement;
+				const expCgCtx = compileNode(ifStat.expression) as UnsavedExpressionCodeGenContext; //TODO: handle cases where the expression is an identifier/constant value (saved value in general)
+				const trueLabel = iBuff.emitNewLabel();
+
+				iBuff.backPatch((expCgCtx as UnsavedExpressionCodeGenContext).trueList, trueLabel);
+				const thenBpCtx = compileNode(ifStat.thenStatement) as StatementCodeGenContext;
+
+				if (ifStat.elseStatement){
+					const falseLabel = iBuff.emitNewLabel();
+					iBuff.backPatch(expCgCtx.falseList, falseLabel);
+					const elseBpCtx = compileNode(ifStat.elseStatement) as StatementCodeGenContext;
+					return new StatementCodeGenContext(elseBpCtx.nextList.concat(thenBpCtx.nextList));
+				}
+				else { //no else statement
+					return new StatementCodeGenContext(expCgCtx.falseList.concat(thenBpCtx.nextList));
+				}
 
 			default:
 				//throw new Error("unsupported node kind: " + ts.SyntaxKind[node.kind]);

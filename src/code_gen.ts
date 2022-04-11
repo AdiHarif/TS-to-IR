@@ -1,12 +1,13 @@
 
 import { assert } from "console";
+import { EWOULDBLOCK } from "constants";
 import * as ts from "typescript";
 import * as ib from "./instruction_buffer.js";
 
 class StatementCodeGenContext {
-	public nextList: number[] = [];
+	public nextList: ib.BpEntry[] = [];
 
-	constructor(nextList: number[]) {
+	constructor(nextList: ib.BpEntry[]) {
 		this.nextList = nextList;
 	}
 
@@ -33,10 +34,10 @@ class UnsavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 	readonly isValueSaved: boolean = false;
 	readonly typeFlags: ts.TypeFlags = ts.TypeFlags.Boolean;
 
-	public trueList: number[] = [];
-	public falseList: number[] = [];
+	public trueList: ib.BpEntry[] = [];
+	public falseList: ib.BpEntry[] = [];
 
-	constructor(trueList: number[], falseList: number[]) {
+	constructor(trueList: ib.BpEntry[], falseList: ib.BpEntry[]) {
 		this.trueList = trueList;
 		this.falseList = falseList;
 	}
@@ -91,8 +92,11 @@ export function compileProgram(fileNames: string[]): void {
 
 			case ts.SyntaxKind.BinaryExpression:
 				const typeFlags = checker.getTypeAtLocation(node).flags;
-				if (typeFlags & ts.TypeFlags.Number){
+				if (typeFlags & ts.TypeFlags.Number) {
 					return emitNumericBinaryExpression(node as ts.BinaryExpression);
+				}
+				if (typeFlags & ts.TypeFlags.Boolean) {
+					return emitBooleanBinaryExpression(node as ts.BinaryExpression)
 				}
 				else {
 					console.log("unsupported expression type flags: " + typeFlags);
@@ -262,6 +266,30 @@ export function compileProgram(fileNames: string[]): void {
 		const resReg = iBuff.getNewReg();
 		iBuff.emit(new ib.NumericOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
 		return new SavedExpressionCodeGenContext(resReg);
+	}
+
+	function emitBooleanBinaryExpression(exp: ts.BinaryExpression): UnsavedExpressionCodeGenContext {
+		const leftCtx = compileNode(exp.left) as SavedExpressionCodeGenContext;
+		const rightCtx = compileNode(exp.right) as SavedExpressionCodeGenContext;
+		switch (exp.operatorToken.kind) {
+			case ts.SyntaxKind.LessThanToken:
+			case ts.SyntaxKind.LessThanEqualsToken:
+			case ts.SyntaxKind.GreaterThanToken:
+			case ts.SyntaxKind.GreaterThanEqualsToken:
+			case ts.SyntaxKind.EqualsEqualsToken:
+			case ts.SyntaxKind.ExclamationEqualsToken:
+				let resReg = iBuff.getNewReg();
+				iBuff.emit(new ib.EqualityOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+				let brInst = iBuff.emit(new ib.ConditionalBranchInstruction(resReg));
+				let trueEntry: ib.BpEntry = { instruction: brInst, index: 0 };
+				let falseEntry: ib.BpEntry = { instruction: brInst, index: 1 };
+				return new UnsavedExpressionCodeGenContext([trueEntry], [falseEntry]);
+
+				break;
+			default:
+				throw new Error("unsupported binary op: " + ts.SyntaxKind[exp.operatorToken.kind]);
+		}
+
 	}
 
 	function emitFunctionCall(retType: ts.TypeFlags, name: string, paramRegs: ib.TypedReg[]): SavedExpressionCodeGenContext {

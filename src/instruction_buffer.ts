@@ -22,12 +22,16 @@ function regIndexToString(reg: number): string {
 	return '%r' + reg.toString();
 }
 
+function labelIndexToString(label: number): string {
+	return "%l" + label.toString()
+}
+
 interface Instruction {
 	toLlvm(): string;
 }
 
 interface PatchableInstruction extends Instruction {
-	patch(label: number): void;
+	patch(label: number, index: 0 | 1): void;
 }
 
 export class FunctionDeclarationInstruction implements Instruction {
@@ -113,6 +117,48 @@ export class NumericOpInstruction implements Instruction {
 	}
 }
 
+export class EqualityOpInstruction implements Instruction {
+	//TODO: merge somehow with NumericOpInstruction
+	private resReg: number;
+	private leftReg: number;
+	private rightReg: number;
+	private op: ts.BinaryOperator;
+
+	constructor(resReg: number, leftReg: number, rightReg: number, op: ts.BinaryOperator) {
+		this.resReg = resReg;
+		this.leftReg = leftReg;
+		this.rightReg = rightReg;
+		this.op = op;
+	}
+
+	toLlvm(): string {
+		let llvmCond: string;
+		switch (this.op) {
+			case ts.SyntaxKind.LessThanToken:
+				llvmCond = "olt";
+				break;
+			case ts.SyntaxKind.LessThanEqualsToken:
+				llvmCond = "ole";
+				break;
+			case ts.SyntaxKind.GreaterThanToken:
+				llvmCond = "ogt";
+				break;
+			case ts.SyntaxKind.GreaterThanEqualsToken:
+				llvmCond = "oge";
+				break;
+			case ts.SyntaxKind.EqualsEqualsToken:
+				llvmCond = "oeq";
+				break;
+			case ts.SyntaxKind.ExclamationEqualsToken:
+				llvmCond = "one";
+				break;
+			default:
+				llvmCond = "unsupported-cond";
+		}
+		return regIndexToString(this.resReg) + " = fcmp " + llvmCond + " " + typeFlagsToLlvmType(ts.TypeFlags.Number) + " " + regIndexToString(this.leftReg) + ", " +  regIndexToString(this.rightReg);
+	}
+}
+
 export class ReturnInstruction implements Instruction {
 	private typeFlags: ts.TypeFlags;
 	private reg: number = 0;
@@ -193,16 +239,34 @@ class LabelInstruction implements Instruction {
 	}
 }
 
-class JumpInstruction implements PatchableInstruction {
-	private label: number = -1;
+export class ConditionalBranchInstruction implements PatchableInstruction {
+	private boolReg:number;
+	private trueLabel:number;
+	private falseLabel:number;
+
+	constructor(boolReg: number, trueLabel?: number, falseLabel?:number) {
+		this.boolReg = boolReg;
+		this.trueLabel = trueLabel ? trueLabel : -1;
+		this.falseLabel = falseLabel ? falseLabel : -1;
+	}
+
+	patch(label: number, index: 0 | 1): void {
+		if (index == 0) {
+			this.trueLabel = label;
+		}
+		else {
+			this.falseLabel = label;
+		}
+	}
 
 	toLlvm(): string {
-		return ""; //TODO: implement
+		return "br i1 " + regIndexToString(this.boolReg) + ", label " + labelIndexToString(this.trueLabel) + ", label " + labelIndexToString(this.falseLabel)
 	}
+}
 
-	patch(label: number): void {
-		this.label = label;
-	}
+export type BpEntry = {
+	instruction: number;
+	index: 0 | 1; //0 means the first label of the instruction, 1 means the second (should be 0 for single label instructions)
 }
 
 export class InstructionBuffer {
@@ -229,17 +293,12 @@ export class InstructionBuffer {
 		return label.index;
 	}
 
-	emitNewJump(): number {
-		const jump = new JumpInstruction();
-		return this.emit(jump);
-	}
-
 	getNewReg(): number {
 		return ++this.regCount;
 	}
 
-	backPatch(locations: number[], label: number) {
-		locations.forEach(loc => (this.codeBuffer[loc] as PatchableInstruction).patch(label));
+	backPatch(entries: BpEntry[], label: number) {
+		entries.forEach(ent => (this.codeBuffer[ent.instruction] as PatchableInstruction).patch(label, ent.index));
 	}
 
 	dumpBuffer(): string {

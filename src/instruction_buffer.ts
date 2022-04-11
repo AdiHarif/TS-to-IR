@@ -235,7 +235,7 @@ class LabelInstruction implements Instruction {
 	}
 
 	toLlvm(): string {
-		return 'l' + this.index.toString();
+		return 'l' + this.index.toString() + ':';
 	}
 }
 

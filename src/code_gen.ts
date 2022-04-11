@@ -284,7 +284,6 @@ export function compileProgram(fileNames: string[]): void {
 				let trueEntry: ib.BpEntry = { instruction: brInst, index: 0 };
 				let falseEntry: ib.BpEntry = { instruction: brInst, index: 1 };
 				return new UnsavedExpressionCodeGenContext([trueEntry], [falseEntry]);
-
 				break;
 			default:
 				throw new Error("unsupported binary op: " + ts.SyntaxKind[exp.operatorToken.kind]);

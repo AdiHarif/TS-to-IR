@@ -1,0 +1,1 @@
+Fireworks example source code is based on - http://www.sunshine2k.de/coding/javascript/graphiceffects/01_fireworks/01_fireworks.html

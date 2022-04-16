@@ -103,10 +103,14 @@ dist
 # TernJS port file
 .tern-port
 
-build/
+build/*.js
+build/*.js.map
 misc/
 .vscode/
 
 # Test tmp files
 tests/**/*.llvm
 tests/**/*.res
+
+res/Fireworks/build/*.js
+res/Fireworks/build/*.js.map

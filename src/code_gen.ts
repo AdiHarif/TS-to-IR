@@ -1,6 +1,5 @@
 
 import { assert } from "console";
-import { EWOULDBLOCK } from "constants";
 import * as ts from "typescript";
 import * as ib from "./instruction_buffer.js";
 
@@ -69,6 +68,9 @@ export function compileProgram(fileNames: string[]): void {
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {
+			case ts.SyntaxKind.ClassDeclaration:
+				return emitClass(node as ts.ClassDeclaration);
+
 			case ts.SyntaxKind.ImportDeclaration:
 				return new StatementCodeGenContext([]);
 
@@ -339,5 +341,29 @@ export function compileProgram(fileNames: string[]): void {
 		const reg = iBuff.getNewReg();
 		iBuff.emit(new ib.NumericAssignmentInstruction(reg, val));
 		return new SavedExpressionCodeGenContext(reg);
+	}
+
+	function emitClass(cl: ts.ClassDeclaration): StatementCodeGenContext {
+		/*
+		 assumptions:
+		 * classes must be named
+		 * class members contain only properties (fields), non-static methods and a single constructor
+		 */
+		let symbol: ts.Symbol = checker.getSymbolAtLocation(cl.name!)!;
+		let type: ts.Type = checker.getDeclaredTypeOfSymbol(symbol);
+		let properties: ts.Symbol[] = checker.getPropertiesOfType(type).filter(sym => sym.flags == ts.SymbolFlags.Property);
+		let propTypes: ts.TypeFlags[] = properties.map(sym => checker.getTypeOfSymbolAtLocation(sym, cl).flags);
+		iBuff.emitStructDefinition(new ib.StructDefinitionInstruction(symbol.name, propTypes));
+		cl.forEachChild(child => {
+			switch (child.kind) {
+				case ts.SyntaxKind.PropertyDeclaration:
+					break;
+				case ts.SyntaxKind.Constructor:
+					break;
+				case ts.SyntaxKind.MethodDeclaration:
+					break;
+			}
+		})
+		return new StatementCodeGenContext([]);
 	}
 }

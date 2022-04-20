@@ -269,10 +269,33 @@ export type BpEntry = {
 	index: 0 | 1; //0 means the first label of the instruction, 1 means the second (should be 0 for single label instructions)
 }
 
+export class StructDefinitionInstruction implements Instruction {
+	private name: string;
+	private typesList: ts.TypeFlags[];
+
+	constructor(name: string, typesList: ts.TypeFlags[]) {
+		this.name = name;
+		this.typesList = typesList;
+	}
+
+	toLlvm(): string {
+		let out = '%' + this.name + ' = type {\n'
+		for (let i = 0; i < this.typesList.length; i++) {
+			out += '\t' + typeFlagsToLlvmType(this.typesList[i]);
+			if (i != this.typesList.length - 1) {
+				out += ",";
+			}
+			out += '\n';
+		}
+		out += '}\n';
+		return out;
+	}
+}
+
 export class InstructionBuffer {
 	private codeBuffer: Instruction[] = [];
 	private dataBuffer: Instruction[] = [];
-	private globalCodeBuffer: Instruction[] = [];
+	private structsBuffer: StructDefinitionInstruction[] = [];
 	private regCount: number = 0;
 
 	constructor() {}
@@ -285,6 +308,11 @@ export class InstructionBuffer {
 	emitData(inst: Instruction): number {
 		this.dataBuffer.push(inst);
 		return this.dataBuffer.length - 1;
+	}
+
+	emitStructDefinition(inst: StructDefinitionInstruction): number {
+		this.structsBuffer.push(inst);
+		return this.structsBuffer.length - 1;
 	}
 
 	emitNewLabel(): number {
@@ -311,6 +339,7 @@ export class InstructionBuffer {
 		);
 		let code: string = declerations;
 		this.dataBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
+		this.structsBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
 		this.codeBuffer.forEach(instruction => {
 			if (!((instruction instanceof FunctionDeclarationInstruction) ||
 			      (instruction instanceof FunctionEndInstruction))) {

@@ -245,20 +245,33 @@ export function compileProgram(fileNames: string[]): void {
 		return sourceFiles.filter(sf => !sf.isDeclarationFile);
 	}
 
-	function getSymbolTypeFlags(symbol: ts.Symbol): ts.TypeFlags {
-		return checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration!).getFlags();
+	function getSymbolTypeFlags(symbol: ts.Symbol): ts.Type {
+		return checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration!);
 	}
 
-	function emitFunctionDeclaration(fun: ts.FunctionDeclaration): void {
+	function emitFunctionDeclaration(fun: ts.FunctionLikeDeclaration, cls?: ts.Type): void {
 		const signature = checker.getSignatureFromDeclaration(fun)!;
-		const retType = checker.getReturnTypeOfSignature(signature).flags;
-		let paramTypes: ts.TypeFlags[] = [];
+		let paramTypes: ts.Type[] = [];
 		for (let i = 0; i < signature.parameters.length; i++) {
 			const paramSymbol = signature.parameters[i];
 			regMap.set(paramSymbol.getName(), -(i + 1));
 			paramTypes.push(getSymbolTypeFlags(paramSymbol));
 		}
-		const id = fun.name!.getText();
+		let id: string;
+		let retType: ts.Type | null;
+		if (fun.kind == ts.SyntaxKind.Constructor) {
+			retType = null;
+			id = 'constructor';
+		}
+		else {
+			retType = checker.getReturnTypeOfSignature(signature);
+			id = fun.name!.getText();
+		}
+
+		if (cls) {
+			id = cls.symbol.getName() + '.' + id;
+			paramTypes.push(cls);
+		}
 		iBuff.emit(new ib.FunctionDeclarationInstruction(id, retType, paramTypes));
 	}
 
@@ -359,11 +372,25 @@ export function compileProgram(fileNames: string[]): void {
 				case ts.SyntaxKind.PropertyDeclaration:
 					break;
 				case ts.SyntaxKind.Constructor:
-					break;
 				case ts.SyntaxKind.MethodDeclaration:
+					emitClassMethod(child as ts.FunctionLikeDeclaration, type);
 					break;
 			}
 		})
 		return new StatementCodeGenContext([]);
+	}
+
+	function emitClassMethod(method: ts.FunctionLikeDeclaration, classType: ts.Type): void {
+		/*
+		 assumptions:
+		 * input declaration must be either a ctor or a class method
+		 */
+		emitFunctionDeclaration(method, classType);
+		emitBlock(method.body as ts.FunctionBody);
+		iBuff.emit(new ib.FunctionEndInstruction());
+	}
+
+	function emitBlock(block: ts.Block): void {
+
 	}
 }

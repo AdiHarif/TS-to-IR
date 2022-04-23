@@ -1,6 +1,16 @@
 
 import * as ts from "typescript";
 
+function typeToLlvmType(type: ts.Type | null): string {
+	if (type == null) {
+		return typeFlagsToLlvmType(ts.TypeFlags.Void);
+	}
+	if (type.isClass()) {
+		return '%' + type.symbol.getName() + '*';
+	}
+	return typeFlagsToLlvmType(type.getFlags());
+}
+
 function typeFlagsToLlvmType(typeFlags: ts.TypeFlags): string {
 	if (typeFlags & ts.TypeFlags.Void) {
 		return 'void';
@@ -36,22 +46,22 @@ interface PatchableInstruction extends Instruction {
 
 export class FunctionDeclarationInstruction implements Instruction {
 	private id: string;
-	private retType: ts.TypeFlags;
-	private paramTypes: ts.TypeFlags[];
+	private retType: ts.Type | null;
+	private paramTypes: ts.Type[];
 
-	constructor(id: string, retType: ts.TypeFlags, paramTypes: ts.TypeFlags[]) {
+	constructor(id: string, retType: ts.Type | null, paramTypes: ts.Type[]) {
 		this.id = id;
 		this.retType = retType;
 		this.paramTypes = paramTypes;
 	}
 
 	toLlvm(): string {
-		let out = "define " + typeFlagsToLlvmType(this.retType) + " @" + this.id + "(";
+		let out = "define " + typeToLlvmType(this.retType) + " @" + this.id + "(";
 		for (let i = 0; i < this.paramTypes.length; i++) {
 			if (i != 0) {
 				out += ", ";
 			}
-			out += typeFlagsToLlvmType(this.paramTypes[i]);
+			out += typeToLlvmType(this.paramTypes[i]);
 		}
 		out += ") {";
 		return out;

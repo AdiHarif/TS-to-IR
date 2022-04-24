@@ -13,7 +13,8 @@ This document describes all the assumptions we make about the input code, by dif
 1. Classes must be named.
 1. Class members contain only properties (fields), non-static methods and a single constructor.
 1. No inheritance is allowed.
-1. All object properties are initialized in the constructor
+1. All object properties are initialized in the constructor.
+1. All object properties access statements are single access and not a chain.
 
 ## Types:
 1. No union\intersection types are allowed.

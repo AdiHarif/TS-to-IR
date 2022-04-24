@@ -94,6 +94,9 @@ export function compileProgram(fileNames: string[]): void {
 
 			case ts.SyntaxKind.BinaryExpression:
 				const typeFlags = checker.getTypeAtLocation(node).flags;
+				if ((node as ts.BinaryExpression).operatorToken.kind == ts.SyntaxKind.EqualsToken) {
+					return emitAssignment(node as ts.BinaryExpression);
+				}
 				if (typeFlags & ts.TypeFlags.Number) {
 					return emitNumericBinaryExpression(node as ts.BinaryExpression);
 				}
@@ -426,6 +429,36 @@ export function compileProgram(fileNames: string[]): void {
 		paramRegs.push({ reg: ptrReg, typeFlags: ts.TypeFlags.Object});
 		let funcName: string = objType.getSymbol()!.getName() + '.constructor'
 		emitFunctionCall(ts.TypeFlags.Void, funcName, paramRegs);
+		return new SavedExpressionCodeGenContext(ptrReg);
+	}
+
+	function emitAssignment(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {
+		let rightCgCtx = compileNode(exp.right) as SavedExpressionCodeGenContext;
+		if (exp.left.kind == ts.SyntaxKind.Identifier) {
+			regMap.set((exp.left as ts.Identifier).getText(), rightCgCtx.reg);
+		}
+		else {
+			assert(exp.left.kind == ts.SyntaxKind.PropertyAccessExpression);
+			//TODO: add assertion of the property access being a property and not function
+			let leftCgCtx: SavedExpressionCodeGenContext = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
+			iBuff.emit(new ib.StoreInstruction(leftCgCtx.reg, rightCgCtx.reg, checker.getTypeAtLocation(exp.right)));
+		}
+		return rightCgCtx;
+	}
+
+	function emitGetPropertyAddress(exp: ts.PropertyAccessExpression): SavedExpressionCodeGenContext {
+		let ptrReg: number = iBuff.getNewReg();
+		let objReg: number;
+		let objType: ts.Type = checker.getTypeAtLocation(exp.expression);
+		let objPropNames = checker.getPropertiesOfType(objType).filter(sym => sym.flags == ts.SymbolFlags.Property).map(sym => sym.getName());
+		let propIndex: number = objPropNames.indexOf(exp.name.getText());
+		if (exp.expression.kind == ts.SyntaxKind.ThisKeyword) {
+			objReg = regMap.get('this')!;
+		}
+		else {
+			objReg = regMap.get((exp.expression as ts.Identifier).getText())!;
+		}
+		iBuff.emit(new ib.GetElementInstruction(ptrReg, objReg, objType, propIndex))
 		return new SavedExpressionCodeGenContext(ptrReg);
 	}
 }

@@ -251,6 +251,42 @@ export class AllocationInstruction implements Instruction {
 		return regIndexToString(this.resReg) + ' = alloca %' + this.type.getSymbol()!.getName(); //TODO: implement
 	}
 }
+
+export class StoreInstruction implements Instruction {
+	private addressReg: number;
+	private valueReg: number;
+	private valueType: ts.Type;
+
+	constructor(addressReg: number, valueReg: number, valueType: ts.Type) {
+		this.addressReg = addressReg;
+		this.valueReg = valueReg;
+		this.valueType = valueType;
+	}
+
+
+	toLlvm(): string {
+		return 'store ' + typeToLlvmType(this.valueType) + ' ' + regIndexToString(this.valueReg) + ', ' + typeToLlvmType(this.valueType) + '* ' + regIndexToString(this.addressReg);
+	}
+}
+
+export class GetElementInstruction implements Instruction {
+	private resReg: number;
+	private objPtrReg: number;
+	private objType: ts.Type;
+	private propertyIndex: number;
+
+	constructor(resReg: number, objPtrReg: number, objType: ts.Type, propertyIndex: number) {
+		this.resReg = resReg;
+		this.objPtrReg = objPtrReg;
+		this.objType = objType;
+		this.propertyIndex = propertyIndex;
+	}
+
+	toLlvm(): string {
+		return regIndexToString(this.resReg) + ' = getelementptr ' + typeToLlvmType(this.objType) + ', ' + typeToLlvmType(this.objType) + '* ' + regIndexToString(this.objPtrReg) + ' , i32 0, i32 ' + this.propertyIndex;
+	}
+}
+
 class LabelInstruction implements Instruction {
 	private static count = 0;
 

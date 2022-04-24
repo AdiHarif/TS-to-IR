@@ -224,6 +224,9 @@ export function compileProgram(fileNames: string[]): void {
 					return new StatementCodeGenContext(expCgCtx.falseList.concat(thenBpCtx.nextList));
 				}
 
+			case ts.SyntaxKind.NewExpression:
+				return emitNewExpression(node as ts.NewExpression);
+
 			default:
 				//throw new Error("unsupported node kind: " + ts.SyntaxKind[node.kind]);
 				console.log("unsupported node kind: " + ts.SyntaxKind[node.kind]);
@@ -402,5 +405,27 @@ export function compileProgram(fileNames: string[]): void {
 			bpCtx = compileNode(statement) as StatementCodeGenContext;
 		});
 		return bpCtx;
+	}
+
+	function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
+		let ptrReg: number = iBuff.getNewReg();
+		let objType: ts.Type = checker.getDeclaredTypeOfSymbol(checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
+		iBuff.emit(new ib.AllocationInstruction(ptrReg, objType));
+		let paramRegs: ib.TypedReg[] = [];
+		//TODO: wrap this part with 'emitArguments' or something similar and merge with compileNode CallExpression case
+		newExp.arguments?.forEach(exp => {
+			const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
+			let argType = checker.getTypeAtLocation(exp).flags;
+			if (argType == ts.TypeFlags.Any) {
+				argType = checker.getContextualType(exp)!.flags;
+			}
+			paramRegs.push({
+				reg: expCtx.reg, typeFlags: argType
+			});
+		});
+		paramRegs.push({ reg: ptrReg, typeFlags: ts.TypeFlags.Object});
+		let funcName: string = objType.getSymbol()!.getName() + '.constructor'
+		emitFunctionCall(ts.TypeFlags.Void, funcName, paramRegs);
+		return new SavedExpressionCodeGenContext(ptrReg);
 	}
 }

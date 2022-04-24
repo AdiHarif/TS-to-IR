@@ -237,6 +237,20 @@ export class FunctionCallInstruction implements Instruction {
 	}
 }
 
+export class AllocationInstruction implements Instruction {
+	private resReg: number;
+	private type: ts.Type;
+
+	constructor(resReg: number, type: ts.Type) {
+		this.resReg = resReg;
+		this.type = type;
+	}
+
+
+	toLlvm(): string {
+		return regIndexToString(this.resReg) + ' = alloca %' + this.type.getSymbol()!.getName(); //TODO: implement
+	}
+}
 class LabelInstruction implements Instruction {
 	private static count = 0;
 

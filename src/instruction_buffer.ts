@@ -1,12 +1,16 @@
 
 import * as ts from "typescript";
 
-function typeToLlvmType(type: ts.Type | null): string {
+function typeToLlvmType(type: ts.Type | null, forceObjPtr: boolean = false): string {
 	if (type == null) {
 		return typeFlagsToLlvmType(ts.TypeFlags.Void);
 	}
-	if (type.isClass()) {
-		return '%' + type.symbol.getName() + '*';
+	if (type.isClass() || type.flags & ts.TypeFlags.TypeParameter) {
+		let out = '%' + type.symbol.getName();
+		if (forceObjPtr) {
+			out += '*';
+		}
+		return out;
 	}
 	return typeFlagsToLlvmType(type.getFlags());
 }
@@ -59,12 +63,12 @@ export class FunctionDeclarationInstruction implements Instruction {
 	}
 
 	toLlvm(): string {
-		let out = "define " + typeToLlvmType(this.retType) + " @" + this.id + "(";
+		let out = "define " + typeToLlvmType(this.retType, true) + " @" + this.id + "(";
 		for (let i = 0; i < this.paramTypes.length; i++) {
 			if (i != 0) {
 				out += ", ";
 			}
-			out += typeToLlvmType(this.paramTypes[i]);
+			out += typeToLlvmType(this.paramTypes[i], true);
 		}
 		out += ") {";
 		return out;

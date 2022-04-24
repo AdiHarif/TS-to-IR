@@ -252,9 +252,10 @@ export function compileProgram(fileNames: string[]): void {
 	function emitFunctionDeclaration(fun: ts.FunctionLikeDeclaration, cls?: ts.Type): void {
 		const signature = checker.getSignatureFromDeclaration(fun)!;
 		let paramTypes: ts.Type[] = [];
+		regMap.clear();
 		for (let i = 0; i < signature.parameters.length; i++) {
 			const paramSymbol = signature.parameters[i];
-			regMap.set(paramSymbol.getName(), -(i + 1));
+			regMap.set(paramSymbol.getName(), -(i + 1)); //TODO: find an elegant representations of function arguments
 			paramTypes.push(getSymbolTypeFlags(paramSymbol));
 		}
 		let id: string;
@@ -271,6 +272,7 @@ export function compileProgram(fileNames: string[]): void {
 		if (cls) {
 			id = cls.symbol.getName() + '.' + id;
 			paramTypes.push(cls);
+			regMap.set('this', -(signature.parameters.length + 1));
 		}
 		iBuff.emit(new ib.FunctionDeclarationInstruction(id, retType, paramTypes));
 	}

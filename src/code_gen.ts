@@ -191,21 +191,13 @@ export function compileProgram(fileNames: string[]): void {
 			case ts.SyntaxKind.SourceFile:
 				//TODO: implement adding main function with script statements (outside functions)
 			case ts.SyntaxKind.Block:
-				let bpCtx = new StatementCodeGenContext([]);
-				(node as ts.BlockLike).statements.forEach(statement => {
-					if (!bpCtx.isEmpty()){
-						const label = iBuff.emitNewLabel();
-						iBuff.backPatch(bpCtx.nextList, label)
-					}
-					bpCtx = compileNode(statement) as StatementCodeGenContext;
-				});
-				return bpCtx;
+				return emitBlock(node as ts.Block);
 
 			case ts.SyntaxKind.FunctionDeclaration:
 				const fun = node as ts.FunctionDeclaration;
 				emitFunctionDeclaration(fun);
+				//TODO: replace compileNode with compileBlock and handle return value
 				compileNode(fun.body!);
-
 				//TODO: make this if more readable
 				if ( checker.getReturnTypeOfSignature(checker.getSignatureFromDeclaration(fun)!).flags & ts.TypeFlags.Void) {
 					iBuff.emit(new ib.ReturnInstruction(ts.TypeFlags.Void));
@@ -388,11 +380,27 @@ export function compileProgram(fileNames: string[]): void {
 		 * input declaration must be either a ctor or a class method
 		 */
 		emitFunctionDeclaration(method, classType);
-		emitBlock(method.body as ts.FunctionBody);
+		let bpCtx = emitBlock(method.body as ts.FunctionBody);
+		if (!bpCtx.isEmpty()) {
+			let label: number = iBuff.emitNewLabel();
+			iBuff.backPatch(bpCtx.nextList, label);
+		}
+		let retType: ts.Type = checker.getSignatureFromDeclaration(method)!.getReturnType();
+		if (retType.getFlags() & ts.TypeFlags.Void) {
+			iBuff.emit(new ib.ReturnInstruction(ts.TypeFlags.Void));
+		}
 		iBuff.emit(new ib.FunctionEndInstruction());
 	}
 
-	function emitBlock(block: ts.Block): void {
-
+	function emitBlock(block: ts.BlockLike): StatementCodeGenContext {
+		let bpCtx = new StatementCodeGenContext([]);
+		block.statements.forEach(statement => {
+			if (!bpCtx.isEmpty()){
+				const label = iBuff.emitNewLabel();
+				iBuff.backPatch(bpCtx.nextList, label)
+			}
+			bpCtx = compileNode(statement) as StatementCodeGenContext;
+		});
+		return bpCtx;
 	}
 }

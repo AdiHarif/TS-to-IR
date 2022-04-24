@@ -26,6 +26,9 @@ function typeFlagsToLlvmType(typeFlags: ts.TypeFlags): string {
 }
 
 function regIndexToString(reg: number): string {
+	if (reg == undefined) {
+		return 'undefined-reg'
+	}
 	if (reg < 0) { //i.e. this is a function variable
 		return '%' + (-1 - reg).toString();
 	}

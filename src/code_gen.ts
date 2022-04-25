@@ -112,6 +112,19 @@ export function compileProgram(fileNames: string[]): void {
 			case ts.SyntaxKind.CallExpression:
 				let callExp = node as ts.CallExpression;
 				let funcName = "";
+
+				let paramRegs: ib.TypedReg[] = [];
+				callExp.arguments.forEach(exp => {
+					const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
+					let argType = checker.getTypeAtLocation(exp);
+					if (argType.getFlags() == ts.TypeFlags.Any) {
+						argType = checker.getContextualType(exp)!;
+					}
+					paramRegs.push({
+						reg: expCtx.reg, type: argType
+					});
+				});
+
 				let retType = null;
 				//TODO: remove handling console.log and replace with printf
 				if (callExp.expression.kind == ts.SyntaxKind.Identifier) {
@@ -132,24 +145,20 @@ export function compileProgram(fileNames: string[]): void {
 					}
 				}
 				else {
-					console.log("unsupported PropertyAccessExpression: " + callExp.expression.getText());
+					if ((callExp.expression as ts.PropertyAccessExpression).expression.kind == ts.SyntaxKind.ThisKeyword) {
+						let objType: ts.Type = checker.getTypeAtLocation((callExp.expression as ts.PropertyAccessExpression).expression);
+						funcName =  objType.getSymbol()!.getName();
+						paramRegs.push({ reg: regMap.get('this')!, type: objType})
+					}
+					else {
+						funcName =  ((callExp.expression as ts.PropertyAccessExpression).expression as ts.Identifier).getText();
+					}
+					funcName += '.' + (callExp.expression as ts.PropertyAccessExpression).name.getText();
 				}
 
 				if (libFunctions.indexOf(funcName) > -1) {
 					return emitLibFuncitonCall(callExp);
 				}
-
-				let paramRegs: ib.TypedReg[] = [];
-				callExp.arguments.forEach(exp => {
-					const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
-					let argType = checker.getTypeAtLocation(exp);
-					if (argType.getFlags() == ts.TypeFlags.Any) {
-						argType = checker.getContextualType(exp)!;
-					}
-					paramRegs.push({
-						reg: expCtx.reg, type: argType
-					});
-				});
 
 				return emitFunctionCall(retType, funcName, paramRegs);
 

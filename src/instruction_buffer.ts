@@ -95,7 +95,7 @@ export class NumericAssignmentInstruction implements Instruction {
 		if (Number.isInteger(this.val)) {
 			llvm_val += ".0";
 		}
-		return regIndexToString(this.reg) + " = fadd double 0.0, " + llvm_val;
+		return regIndexToString(this.reg) + ' = fadd ' + typeFlagsToLlvmType(ts.TypeFlags.Number) + ' 0.0, ' + llvm_val;
 	}
 }
 

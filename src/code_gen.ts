@@ -125,11 +125,10 @@ export function compileProgram(fileNames: string[]): void {
 					});
 				});
 
-				let retType = null;
+				let retType: ts.Type | null = checker.getTypeAtLocation(callExp);
 				//TODO: remove handling console.log and replace with printf
 				if (callExp.expression.kind == ts.SyntaxKind.Identifier) {
 					funcName = (callExp.expression as ts.Identifier).text;
-					retType = checker.getTypeAtLocation(callExp);
 				}
 				else if (callExp.expression.kind == ts.SyntaxKind.PropertyAccessExpression &&
 					 callExp.expression.getText() == "console.log") {

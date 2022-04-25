@@ -404,7 +404,7 @@ export function compileProgram(fileNames: string[]): void {
 			iBuff.backPatch(bpCtx.nextList, label);
 		}
 		let retType: ts.Type = checker.getSignatureFromDeclaration(method)!.getReturnType();
-		if (retType.getFlags() & ts.TypeFlags.Void) {
+		if (retType.getFlags() & ts.TypeFlags.Void || method.kind == ts.SyntaxKind.Constructor) {
 			iBuff.emit(new ib.ReturnInstruction(null));
 		}
 		iBuff.emit(new ib.FunctionEndInstruction());

@@ -21,7 +21,7 @@ function typeFlagsToLlvmType(typeFlags: ts.TypeFlags): string {
 	}
 	if ((typeFlags & ts.TypeFlags.Number) ||
 	    (typeFlags & ts.TypeFlags.NumberLiteral)) {
-		return 'double';
+		return 'float';
 	}
 	if (typeFlags & ts.TypeFlags.Boolean) {
 		return 'i1';
@@ -189,9 +189,10 @@ export class ReturnInstruction implements Instruction {
 
 	toLlvm(): string {
 		let out = "ret " + typeToLlvmType(this.retType, true);
-		if (this.retType == null || !(this.retType.flags & ts.TypeFlags.Void)) {
-			out += ' ' + regIndexToString(this.reg);
+		if (this.retType == null || (this.retType.flags & ts.TypeFlags.Void)) {
+			return out;
 		}
+		out += ' ' + regIndexToString(this.reg);
 		return out;
 	}
 }

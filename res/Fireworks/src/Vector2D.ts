@@ -104,12 +104,12 @@ export class Vector2D
 
 	/* Opposite */
 	opposite(): void {
-		this.X = -this.X;
-		this.Y = -this.Y;
+		this.X = 0 - this.X;
+		this.Y = 0 - this.Y;
 	}
 
 	getOpposite(): Vector2D {
-		return new Vector2D(-this.X, -this.Y);
+		return new Vector2D(0 - this.X, 0 - this.Y);
 	}
 
 	/* IsOrthogonal */
@@ -158,7 +158,7 @@ export class Vector2D
 			}
 			else
 			{
-				return -Math.PI / 2;
+				return 0 - (Math.PI / 2);
 			}
 		}
 		else if (this.X < 0)
@@ -181,10 +181,6 @@ export class Vector2D
 	/* Projected */
 	getProjectLength(v: Vector2D): number {
 		return (this.dotProduct(v) / this.getLength());
-	}
-
-	getProjectVector(v: Vector2D): Vector2D {
-		return this.getNormalized().getMul(this.dotProduct(v) / this.getLength());
 	}
 }
 

@@ -215,7 +215,7 @@ export class FunctionCallInstruction implements Instruction {
 
 	toLlvm(): string {
 		let out = "";
-		if (this.resReg.type == null || !(this.resReg.type.flags & ts.TypeFlags.Void)) {
+		if (this.resReg.type != null && !(this.resReg.type.flags & ts.TypeFlags.Void)) {
 			out += regIndexToString(this.resReg.reg) + " = ";
 		}
 		out += "call " + typeToLlvmType(this.resReg.type, true);

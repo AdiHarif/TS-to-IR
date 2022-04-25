@@ -149,34 +149,34 @@ export class Vector2D
 		return this.getLength();
 	}
 
-	getPolarAngle(): number {
-		if (this.X == 0)
-		{
-			if (this.Y > 0)
-			{
-				return Math.PI / 2;
-			}
-			else
-			{
-				return 0 - (Math.PI / 2);
-			}
-		}
-		else if (this.X < 0)
-		{
-			if (this.Y >= 0)
-			{
-				return Math.atan(this.Y / this.X) + Math.PI / 2;
-			}
-			else
-			{
-				return Math.atan(this.Y / this.X) - Math.PI / 2;
-			}
-		}
-		else
-		{
-			return Math.atan(this.Y / this.X);
-		}
-	}
+	// getPolarAngle(): number {
+	// 	if (this.X == 0)
+	// 	{
+	// 		if (this.Y > 0)
+	// 		{
+	// 			return Math.PI / 2;
+	// 		}
+	// 		else
+	// 		{
+	// 			return 0 - (Math.PI / 2);
+	// 		}
+	// 	}
+	// 	else if (this.X < 0)
+	// 	{
+	// 		if (this.Y >= 0)
+	// 		{
+	// 			return Math.atan(this.Y / this.X) + Math.PI / 2;
+	// 		}
+	// 		else
+	// 		{
+	// 			return Math.atan(this.Y / this.X) - Math.PI / 2;
+	// 		}
+	// 	}
+	// 	else
+	// 	{
+	// 		return Math.atan(this.Y / this.X);
+	// 	}
+	// }
 
 	/* Projected */
 	getProjectLength(v: Vector2D): number {

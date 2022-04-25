@@ -36,13 +36,13 @@ export class Vector2D
 
 	/* Addition */
 	add(dx: number, dy: number): void {
-		this.X += dx;
-		this.Y += dy;
+		this.X = this.X + dx;
+		this.Y = this.Y + dy;
 	}
 
 	addVec(v: Vector2D): void {
-		this.X += v.X;
-		this.Y += v.Y;
+		this.X = this.X + v.X;
+		this.Y = this.Y + v.Y;
 	}
 
 	getAdd(dx: number, dy: number): Vector2D {
@@ -55,13 +55,13 @@ export class Vector2D
 
 	/* Subtraction */
 	sub(dx: number, dy: number): void {
-		this.X -= dx;
-		this.Y -= dy;
+		this.X = this.X - dx;
+		this.Y = this.Y - dy;
 	}
 
 	subVec(v: Vector2D): void {
-		this.X -= v.X;
-		this.Y -= v.Y;
+		this.X = this.X - v.X;
+		this.Y = this.Y - v.Y;
 	}
 
 	getSub(dx: number, dy: number): Vector2D {
@@ -74,7 +74,8 @@ export class Vector2D
 
 	/* Multiplication */
 	mul(s: number): void {
-		this.X *= s; this.Y *= s;
+		this.X = this.X * s;
+		this.Y = this.Y * s;
 	}
 
 	getMul(s: number): Vector2D {
@@ -83,7 +84,8 @@ export class Vector2D
 
 	/* Division */
 	div(s: number): void {
-		this.X /= s; this.Y /= s;
+		this.X = this.X / s;
+		this.Y = this.Y / s;
 	}
 
 	getDiv(s: number): Vector2D {
@@ -102,28 +104,12 @@ export class Vector2D
 
 	/* Opposite */
 	opposite(): void {
-		this.X = -this.X; this.Y = -this.Y;
+		this.X = -this.X;
+		this.Y = -this.Y;
 	}
 
 	getOpposite(): Vector2D {
 		return new Vector2D(-this.X, -this.Y);
-	}
-
-	/* Perpendicular */
-	perpendicularCCW(): void {
-		this.X = -this.Y; this.Y = this.X;
-	}
-
-	getPerpendicularCCW(): Vector2D {
-		return new Vector2D(-this.Y, this.X);
-	}
-
-	perpendicularCW(): void {
-		this.X = this.Y; this.Y = -this.X;
-	}
-
-	getPerpendicularCW(): Vector2D {
-		return new Vector2D(this.Y, -this.X);
 	}
 
 	/* IsOrthogonal */

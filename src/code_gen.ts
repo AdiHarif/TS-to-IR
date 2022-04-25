@@ -239,6 +239,9 @@ export function compileProgram(fileNames: string[]): void {
 			case ts.SyntaxKind.NewExpression:
 				return emitNewExpression(node as ts.NewExpression);
 
+			case ts.SyntaxKind.PropertyAccessExpression:
+				return emitLoadProperty(node as ts.PropertyAccessExpression);
+
 			default:
 				//throw new Error("unsupported node kind: " + ts.SyntaxKind[node.kind]);
 				console.log("unsupported node kind: " + ts.SyntaxKind[node.kind]);
@@ -469,5 +472,13 @@ export function compileProgram(fileNames: string[]): void {
 		}
 		iBuff.emit(new ib.GetElementInstruction(ptrReg, objReg, objType, propIndex))
 		return new SavedExpressionCodeGenContext(ptrReg);
+	}
+
+	function emitLoadProperty(exp: ts.PropertyAccessExpression): SavedExpressionCodeGenContext {
+		let addressCgCtx = emitGetPropertyAddress(exp);
+		let resReg = iBuff.getNewReg();
+		let valType: ts.Type = checker.getTypeAtLocation(exp);
+		iBuff.emit(new ib.LoadInstruction(addressCgCtx.reg, resReg, valType))
+		return new SavedExpressionCodeGenContext(resReg);
 	}
 }

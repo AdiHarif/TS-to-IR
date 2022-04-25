@@ -273,6 +273,22 @@ export class StoreInstruction implements Instruction {
 	}
 }
 
+export class LoadInstruction implements Instruction {
+	private addressReg: number;
+	private valueReg: number;
+	private valueType: ts.Type;
+
+	constructor(addressReg: number, valueReg: number, valueType: ts.Type) {
+		this.addressReg = addressReg;
+		this.valueReg = valueReg;
+		this.valueType = valueType;
+	}
+
+	toLlvm(): string {
+		let llvmType = typeToLlvmType(this.valueType);
+		return regIndexToString(this.valueReg) + ' = load ' + llvmType + ', ' + llvmType + '* ' + regIndexToString(this.addressReg);
+	}
+}
 export class GetElementInstruction implements Instruction {
 	private resReg: number;
 	private objPtrReg: number;

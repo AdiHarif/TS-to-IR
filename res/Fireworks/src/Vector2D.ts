@@ -112,15 +112,15 @@ export class Vector2D
 		return new Vector2D(0 - this.X, 0 - this.Y);
 	}
 
-	/* IsOrthogonal */
-	IsOrthogonal(v: Vector2D): boolean {
-		return this.dotProduct(v) == 0;
-	}
+	// /* IsOrthogonal */
+	// IsOrthogonal(v: Vector2D): boolean {
+	// 	return this.dotProduct(v) == 0;
+	// }
 
-	/* IsColinear */
-	isColinear(v: Vector2D): boolean {
-		return this.perpDotProduct(v) == 0;
-	}
+	// /* IsColinear */
+	// isColinear(v: Vector2D): boolean {
+	// 	return this.perpDotProduct(v) == 0;
+	// }
 
 	/* Rotate */
 	rotate(angle: number): void {

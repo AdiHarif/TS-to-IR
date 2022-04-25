@@ -15,6 +15,7 @@ This document describes all the assumptions we make about the input code, by dif
 1. No inheritance is allowed.
 1. All object properties are initialized in the constructor.
 1. All object properties access statements are single access and not a chain.
+1. All class fields has none-class types
 
 ## Types:
 1. No union\intersection types are allowed.

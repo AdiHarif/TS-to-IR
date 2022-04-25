@@ -177,19 +177,19 @@ export class EqualityOpInstruction implements Instruction {
 }
 
 export class ReturnInstruction implements Instruction {
-	private typeFlags: ts.TypeFlags;
+	private retType: ts.Type | null;
 	private reg: number = 0;
 
-	constructor(typeFlags: ts.TypeFlags, reg?: number) {
-		this.typeFlags = typeFlags;
+	constructor(retType: ts.Type | null, reg?: number) {
+		this.retType = retType;
 		if (reg) {
 			this.reg = reg;
 		}
 	}
 
 	toLlvm(): string {
-		let out = "ret " + typeFlagsToLlvmType(this.typeFlags);
-		if (!(this.typeFlags & ts.TypeFlags.Void)) {
+		let out = "ret " + typeToLlvmType(this.retType, true);
+		if (this.retType == null || !(this.retType.flags & ts.TypeFlags.Void)) {
 			out += ' ' + regIndexToString(this.reg);
 		}
 		return out;
@@ -198,7 +198,7 @@ export class ReturnInstruction implements Instruction {
 
 export type TypedReg = {
 	reg: number;
-	typeFlags: ts.TypeFlags;
+	type: ts.Type | null;
 }
 
 export class FunctionCallInstruction implements Instruction {
@@ -214,17 +214,17 @@ export class FunctionCallInstruction implements Instruction {
 
 	toLlvm(): string {
 		let out = "";
-		if (!(this.resReg.typeFlags & ts.TypeFlags.Void)) {
+		if (this.resReg.type == null || !(this.resReg.type.flags & ts.TypeFlags.Void)) {
 			out += regIndexToString(this.resReg.reg) + " = ";
 		}
-		out += "call " + typeFlagsToLlvmType(this.resReg.typeFlags);
+		out += "call " + typeToLlvmType(this.resReg.type, true);
 		if (this.paramRegs.length != 0) {
 			out += " (";
 			for (let i = 0; i < this.paramRegs.length; i++) {
 				if (i != 0) {
 					out += ", ";
 				}
-				out += typeFlagsToLlvmType(this.paramRegs[i].typeFlags);
+				out += typeToLlvmType(this.paramRegs[i].type, true);
 			}
 			out += ")";
 		}
@@ -234,7 +234,7 @@ export class FunctionCallInstruction implements Instruction {
 				out += ", ";
 			}
 			const typedReg = this.paramRegs[i];
-			out += typeFlagsToLlvmType(typedReg.typeFlags) + " " + regIndexToString(typedReg.reg);
+			out += typeToLlvmType(typedReg.type, true) + " " + regIndexToString(typedReg.reg);
 		}
 		out += ")";
 		return out;

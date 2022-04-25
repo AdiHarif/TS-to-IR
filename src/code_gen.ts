@@ -112,16 +112,16 @@ export function compileProgram(fileNames: string[]): void {
 			case ts.SyntaxKind.CallExpression:
 				let callExp = node as ts.CallExpression;
 				let funcName = "";
-				let retType = ts.TypeFlags.Unknown;
+				let retType = null;
 				//TODO: remove handling console.log and replace with printf
 				if (callExp.expression.kind == ts.SyntaxKind.Identifier) {
 					funcName = (callExp.expression as ts.Identifier).text;
-					retType = checker.getTypeAtLocation(callExp).flags;
+					retType = checker.getTypeAtLocation(callExp);
 				}
 				else if (callExp.expression.kind == ts.SyntaxKind.PropertyAccessExpression &&
 					 callExp.expression.getText() == "console.log") {
 
-					retType = ts.TypeFlags.Void;
+					retType = null;
 					//TODO: handle multiple arguments and other argument types
 					let argType = checker.getTypeAtLocation(callExp.arguments[0]).flags;
 					if (argType & ts.TypeFlags.String) {
@@ -142,12 +142,12 @@ export function compileProgram(fileNames: string[]): void {
 				let paramRegs: ib.TypedReg[] = [];
 				callExp.arguments.forEach(exp => {
 					const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
-					let argType = checker.getTypeAtLocation(exp).flags;
-					if (argType == ts.TypeFlags.Any) {
-						argType = checker.getContextualType(exp)!.flags;
+					let argType = checker.getTypeAtLocation(exp);
+					if (argType.getFlags() == ts.TypeFlags.Any) {
+						argType = checker.getContextualType(exp)!;
 					}
 					paramRegs.push({
-						reg: expCtx.reg, typeFlags: argType
+						reg: expCtx.reg, type: argType
 					});
 				});
 
@@ -182,11 +182,11 @@ export function compileProgram(fileNames: string[]): void {
 					else {
 						retReg = (expCtx as SavedExpressionCodeGenContext).reg;
 					}
-					let retType = checker.getTypeAtLocation(retStat.expression).flags;
+					let retType = checker.getTypeAtLocation(retStat.expression);
 					retInst = new ib.ReturnInstruction(retType, retReg);
 				}
 				else {
-					retInst = new ib.ReturnInstruction(ts.TypeFlags.Void);
+					retInst = new ib.ReturnInstruction(null);
 				}
 				iBuff.emit(retInst);
 				return new StatementCodeGenContext([]);
@@ -203,7 +203,7 @@ export function compileProgram(fileNames: string[]): void {
 				compileNode(fun.body!);
 				//TODO: make this if more readable
 				if ( checker.getReturnTypeOfSignature(checker.getSignatureFromDeclaration(fun)!).flags & ts.TypeFlags.Void) {
-					iBuff.emit(new ib.ReturnInstruction(ts.TypeFlags.Void));
+					iBuff.emit(new ib.ReturnInstruction(null));
 				}
 
 				iBuff.emit(new ib.FunctionEndInstruction());
@@ -306,11 +306,11 @@ export function compileProgram(fileNames: string[]): void {
 
 	}
 
-	function emitFunctionCall(retType: ts.TypeFlags, name: string, paramRegs: ib.TypedReg[]): SavedExpressionCodeGenContext {
+	function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: ib.TypedReg[]): SavedExpressionCodeGenContext {
 		//TODO: remove allocating new reg for void functions
 		const retReg: ib.TypedReg = {
 			reg: iBuff.getNewReg(),
-			typeFlags: retType
+			type: retType
 		};
 		iBuff.emit(new ib.FunctionCallInstruction(retReg, name, paramRegs));
 		return new SavedExpressionCodeGenContext(retReg.reg);
@@ -320,7 +320,7 @@ export function compileProgram(fileNames: string[]): void {
 		const funName = (funCall.expression as ts.Identifier).getText();
 		const args = funCall.arguments;
 		let llvmFunName = "";
-		let llvmRetType = ts.TypeFlags.Void;
+		let llvmRetType = null;
 		let llvmArgs: ib.TypedReg[] = [];
 		switch (funName){
 			case "scanf":
@@ -331,7 +331,7 @@ export function compileProgram(fileNames: string[]): void {
 					case '\"%lf\"':
 					case '\"%d\"':
 						llvmFunName = "scand";
-						llvmRetType = ts.TypeFlags.Number
+						llvmRetType = null; //TODO: restore this to be number type
 						break;
 					default:
 						throw new Error("unsupported scanf format: " + format);
@@ -344,7 +344,7 @@ export function compileProgram(fileNames: string[]): void {
 		//TODO: remove allocating new reg for void functions
 		const llvmRetReg: ib.TypedReg = {
 			reg: iBuff.getNewReg(),
-			typeFlags: llvmRetType
+			type: llvmRetType
 		};
 		iBuff.emit(new ib.FunctionCallInstruction(llvmRetReg, llvmFunName, llvmArgs));
 		return new SavedExpressionCodeGenContext(llvmRetReg.reg);
@@ -393,7 +393,7 @@ export function compileProgram(fileNames: string[]): void {
 		}
 		let retType: ts.Type = checker.getSignatureFromDeclaration(method)!.getReturnType();
 		if (retType.getFlags() & ts.TypeFlags.Void) {
-			iBuff.emit(new ib.ReturnInstruction(ts.TypeFlags.Void));
+			iBuff.emit(new ib.ReturnInstruction(null));
 		}
 		iBuff.emit(new ib.FunctionEndInstruction());
 	}
@@ -418,17 +418,17 @@ export function compileProgram(fileNames: string[]): void {
 		//TODO: wrap this part with 'emitArguments' or something similar and merge with compileNode CallExpression case
 		newExp.arguments?.forEach(exp => {
 			const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
-			let argType = checker.getTypeAtLocation(exp).flags;
-			if (argType == ts.TypeFlags.Any) {
-				argType = checker.getContextualType(exp)!.flags;
+			let argType = checker.getTypeAtLocation(exp);
+			if (argType.getFlags() == ts.TypeFlags.Any) {
+				argType = checker.getContextualType(exp)!;
 			}
 			paramRegs.push({
-				reg: expCtx.reg, typeFlags: argType
+				reg: expCtx.reg, type: argType
 			});
 		});
-		paramRegs.push({ reg: ptrReg, typeFlags: ts.TypeFlags.Object});
+		paramRegs.push({ reg: ptrReg, type: objType});
 		let funcName: string = objType.getSymbol()!.getName() + '.constructor'
-		emitFunctionCall(ts.TypeFlags.Void, funcName, paramRegs);
+		emitFunctionCall(null, funcName, paramRegs);
 		return new SavedExpressionCodeGenContext(ptrReg);
 	}
 

@@ -1,7 +1,7 @@
 
 import { assert } from "console";
 import * as ts from "typescript";
-import * as ib from "./instruction_buffer.js";
+import * as ib from "../instruction_buffer.js";
 
 class StatementCodeGenContext {
 	public nextList: ib.BpEntry[] = [];

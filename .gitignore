@@ -103,8 +103,8 @@ dist
 # TernJS port file
 .tern-port
 
-build/*.js
-build/*.js.map
+build/**/*.js
+build/**/*.js.map
 misc/
 .vscode/
 

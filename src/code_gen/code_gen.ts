@@ -1,6 +1,8 @@
 
 import { assert } from "console";
 import * as ts from "typescript";
+
+import * as cgm from "./manager.js"
 import * as ib from "../instruction_buffer.js";
 
 class StatementCodeGenContext {
@@ -50,20 +52,12 @@ const libFunctions = [ //TODO: add printf and remove handling console.log
 ];
 
 export function compileProgram(fileNames: string[]): void {
-	const options: ts.CompilerOptions = {
-	};
-	const program = ts.createProgram(fileNames, options); //TODO: add compiler options handling
-	let sourceFiles = getSourceFiles();
-	//TODO: check if the programs syntax\semantics are ok
 
+	cgm.InitManager(fileNames);
 
-	const checker = program.getTypeChecker();
-	let iBuff = new ib.InstructionBuffer();
-	let regMap = new Map<string, number>();
+	cgm.sourceFiles.forEach(compileNode);
 
-	sourceFiles.forEach(compileNode);
-
-	const outCode = iBuff.dumpBuffer();
+	const outCode = cgm.iBuff.dumpBuffer();
 	console.log(outCode);
 
 	function compileNode(node: ts.Node): CodeGenContext {
@@ -76,7 +70,7 @@ export function compileProgram(fileNames: string[]): void {
 
 			case ts.SyntaxKind.Identifier:
 				const id = node as ts.Identifier;
-				const reg = regMap.get(id.text);
+				const reg = cgm.regMap.get(id.text);
 				return new SavedExpressionCodeGenContext(reg!);
 
 			case ts.SyntaxKind.NumericLiteral:
@@ -93,7 +87,7 @@ export function compileProgram(fileNames: string[]): void {
 				return new StatementCodeGenContext([]);
 
 			case ts.SyntaxKind.BinaryExpression:
-				const typeFlags = checker.getTypeAtLocation(node).flags;
+				const typeFlags = cgm.checker.getTypeAtLocation(node).flags;
 				if ((node as ts.BinaryExpression).operatorToken.kind == ts.SyntaxKind.EqualsToken) {
 					return emitAssignment(node as ts.BinaryExpression);
 				}
@@ -116,16 +110,16 @@ export function compileProgram(fileNames: string[]): void {
 				let paramRegs: ib.TypedReg[] = [];
 				callExp.arguments.forEach(exp => {
 					const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
-					let argType = checker.getTypeAtLocation(exp);
+					let argType = cgm.checker.getTypeAtLocation(exp);
 					if (argType.getFlags() == ts.TypeFlags.Any) {
-						argType = checker.getContextualType(exp)!;
+						argType = cgm.checker.getContextualType(exp)!;
 					}
 					paramRegs.push({
 						reg: expCtx.reg, type: argType
 					});
 				});
 
-				let retType: ts.Type | null = checker.getTypeAtLocation(callExp);
+				let retType: ts.Type | null = cgm.checker.getTypeAtLocation(callExp);
 				//TODO: remove handling console.log and replace with printf
 				if (callExp.expression.kind == ts.SyntaxKind.Identifier) {
 					funcName = (callExp.expression as ts.Identifier).text;
@@ -135,7 +129,7 @@ export function compileProgram(fileNames: string[]): void {
 
 					retType = null;
 					//TODO: handle multiple arguments and other argument types
-					let argType = checker.getTypeAtLocation(callExp.arguments[0]).flags;
+					let argType = cgm.checker.getTypeAtLocation(callExp.arguments[0]).flags;
 					if (argType & ts.TypeFlags.String) {
 						funcName = "prints";
 					}
@@ -145,9 +139,9 @@ export function compileProgram(fileNames: string[]): void {
 				}
 				else {
 					if ((callExp.expression as ts.PropertyAccessExpression).expression.kind == ts.SyntaxKind.ThisKeyword) {
-						let objType: ts.Type = checker.getTypeAtLocation((callExp.expression as ts.PropertyAccessExpression).expression);
+						let objType: ts.Type = cgm.checker.getTypeAtLocation((callExp.expression as ts.PropertyAccessExpression).expression);
 						funcName =  objType.getSymbol()!.getName();
-						paramRegs.push({ reg: regMap.get('this')!, type: objType})
+						paramRegs.push({ reg: cgm.regMap.get('this')!, type: objType})
 					}
 					else {
 						funcName =  ((callExp.expression as ts.PropertyAccessExpression).expression as ts.Identifier).getText();
@@ -170,7 +164,7 @@ export function compileProgram(fileNames: string[]): void {
 				if (varDec.initializer) {
 					let expCtx = compileNode(varDec.initializer) as ExpressionCodeGenContext;
 					if (expCtx.isValueSaved) {
-						regMap.set(varDec.name.getText(), (expCtx as SavedExpressionCodeGenContext).reg);
+						cgm.regMap.set(varDec.name.getText(), (expCtx as SavedExpressionCodeGenContext).reg);
 					}
 					else {
 						//TODO: save bool value if necessary
@@ -190,13 +184,13 @@ export function compileProgram(fileNames: string[]): void {
 					else {
 						retReg = (expCtx as SavedExpressionCodeGenContext).reg;
 					}
-					let retType = checker.getTypeAtLocation(retStat.expression);
+					let retType = cgm.checker.getTypeAtLocation(retStat.expression);
 					retInst = new ib.ReturnInstruction(retType, retReg);
 				}
 				else {
 					retInst = new ib.ReturnInstruction(null);
 				}
-				iBuff.emit(retInst);
+				cgm.iBuff.emit(retInst);
 				return new StatementCodeGenContext([]);
 
 			case ts.SyntaxKind.SourceFile:
@@ -210,24 +204,24 @@ export function compileProgram(fileNames: string[]): void {
 				//TODO: replace compileNode with compileBlock and handle return value
 				compileNode(fun.body!);
 				//TODO: make this if more readable
-				if ( checker.getReturnTypeOfSignature(checker.getSignatureFromDeclaration(fun)!).flags & ts.TypeFlags.Void) {
-					iBuff.emit(new ib.ReturnInstruction(null));
+				if ( cgm.checker.getReturnTypeOfSignature(cgm.checker.getSignatureFromDeclaration(fun)!).flags & ts.TypeFlags.Void) {
+					cgm.iBuff.emit(new ib.ReturnInstruction(null));
 				}
 
-				iBuff.emit(new ib.FunctionEndInstruction());
+				cgm.iBuff.emit(new ib.FunctionEndInstruction());
 				return new StatementCodeGenContext([]);
 
 			case ts.SyntaxKind.IfStatement:
 				const ifStat = node as ts.IfStatement;
 				const expCgCtx = compileNode(ifStat.expression) as UnsavedExpressionCodeGenContext; //TODO: handle cases where the expression is an identifier/constant value (saved value in general)
-				const trueLabel = iBuff.emitNewLabel();
+				const trueLabel = cgm.iBuff.emitNewLabel();
 
-				iBuff.backPatch((expCgCtx as UnsavedExpressionCodeGenContext).trueList, trueLabel);
+				cgm.iBuff.backPatch((expCgCtx as UnsavedExpressionCodeGenContext).trueList, trueLabel);
 				const thenBpCtx = compileNode(ifStat.thenStatement) as StatementCodeGenContext;
 
 				if (ifStat.elseStatement){
-					const falseLabel = iBuff.emitNewLabel();
-					iBuff.backPatch(expCgCtx.falseList, falseLabel);
+					const falseLabel = cgm.iBuff.emitNewLabel();
+					cgm.iBuff.backPatch(expCgCtx.falseList, falseLabel);
 					const elseBpCtx = compileNode(ifStat.elseStatement) as StatementCodeGenContext;
 					return new StatementCodeGenContext(elseBpCtx.nextList.concat(thenBpCtx.nextList));
 				}
@@ -249,22 +243,17 @@ export function compileProgram(fileNames: string[]): void {
 		}
 	}
 
-	function getSourceFiles(): ts.SourceFile[] {
-		const sourceFiles = program.getSourceFiles();
-		return sourceFiles.filter(sf => !sf.isDeclarationFile);
-	}
-
 	function getSymbolTypeFlags(symbol: ts.Symbol): ts.Type {
-		return checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration!);
+		return cgm.checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration!);
 	}
 
 	function emitFunctionDeclaration(fun: ts.FunctionLikeDeclaration, cls?: ts.Type): void {
-		const signature = checker.getSignatureFromDeclaration(fun)!;
+		const signature = cgm.checker.getSignatureFromDeclaration(fun)!;
 		let paramTypes: ts.Type[] = [];
-		regMap.clear();
+		cgm.regMap.clear();
 		for (let i = 0; i < signature.parameters.length; i++) {
 			const paramSymbol = signature.parameters[i];
-			regMap.set(paramSymbol.getName(), -(i + 1)); //TODO: find an elegant representations of function arguments
+			cgm.regMap.set(paramSymbol.getName(), -(i + 1)); //TODO: find an elegant representations of function arguments
 			paramTypes.push(getSymbolTypeFlags(paramSymbol));
 		}
 		let id: string;
@@ -274,23 +263,23 @@ export function compileProgram(fileNames: string[]): void {
 			id = 'constructor';
 		}
 		else {
-			retType = checker.getReturnTypeOfSignature(signature);
+			retType = cgm.checker.getReturnTypeOfSignature(signature);
 			id = fun.name!.getText();
 		}
 
 		if (cls) {
 			id = cls.symbol.getName() + '.' + id;
 			paramTypes.push(cls);
-			regMap.set('this', -(signature.parameters.length + 1));
+			cgm.regMap.set('this', -(signature.parameters.length + 1));
 		}
-		iBuff.emit(new ib.FunctionDeclarationInstruction(id, retType, paramTypes));
+		cgm.iBuff.emit(new ib.FunctionDeclarationInstruction(id, retType, paramTypes));
 	}
 
 	function emitNumericBinaryExpression(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {
 		const leftCtx = compileNode(exp.left) as SavedExpressionCodeGenContext;
 		const rightCtx = compileNode(exp.right) as SavedExpressionCodeGenContext;
-		const resReg = iBuff.getNewReg();
-		iBuff.emit(new ib.NumericOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+		const resReg = cgm.iBuff.getNewReg();
+		cgm.iBuff.emit(new ib.NumericOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
 		return new SavedExpressionCodeGenContext(resReg);
 	}
 
@@ -304,9 +293,9 @@ export function compileProgram(fileNames: string[]): void {
 			case ts.SyntaxKind.GreaterThanEqualsToken:
 			case ts.SyntaxKind.EqualsEqualsToken:
 			case ts.SyntaxKind.ExclamationEqualsToken:
-				let resReg = iBuff.getNewReg();
-				iBuff.emit(new ib.EqualityOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
-				let brInst = iBuff.emit(new ib.ConditionalBranchInstruction(resReg));
+				let resReg = cgm.iBuff.getNewReg();
+				cgm.iBuff.emit(new ib.EqualityOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+				let brInst = cgm.iBuff.emit(new ib.ConditionalBranchInstruction(resReg));
 				let trueEntry: ib.BpEntry = { instruction: brInst, index: 0 };
 				let falseEntry: ib.BpEntry = { instruction: brInst, index: 1 };
 				return new UnsavedExpressionCodeGenContext([trueEntry], [falseEntry]);
@@ -320,10 +309,10 @@ export function compileProgram(fileNames: string[]): void {
 	function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: ib.TypedReg[]): SavedExpressionCodeGenContext {
 		//TODO: remove allocating new reg for void functions
 		const retReg: ib.TypedReg = {
-			reg: iBuff.getNewReg(),
+			reg: cgm.iBuff.getNewReg(),
 			type: retType
 		};
-		iBuff.emit(new ib.FunctionCallInstruction(retReg, name, paramRegs));
+		cgm.iBuff.emit(new ib.FunctionCallInstruction(retReg, name, paramRegs));
 		return new SavedExpressionCodeGenContext(retReg.reg);
 	}
 
@@ -354,16 +343,16 @@ export function compileProgram(fileNames: string[]): void {
 
 		//TODO: remove allocating new reg for void functions
 		const llvmRetReg: ib.TypedReg = {
-			reg: iBuff.getNewReg(),
+			reg: cgm.iBuff.getNewReg(),
 			type: llvmRetType
 		};
-		iBuff.emit(new ib.FunctionCallInstruction(llvmRetReg, llvmFunName, llvmArgs));
+		cgm.iBuff.emit(new ib.FunctionCallInstruction(llvmRetReg, llvmFunName, llvmArgs));
 		return new SavedExpressionCodeGenContext(llvmRetReg.reg);
 	}
 
 	function emitSaveNumericValue(val: number): SavedExpressionCodeGenContext {
-		const reg = iBuff.getNewReg();
-		iBuff.emit(new ib.NumericAssignmentInstruction(reg, val));
+		const reg = cgm.iBuff.getNewReg();
+		cgm.iBuff.emit(new ib.NumericAssignmentInstruction(reg, val));
 		return new SavedExpressionCodeGenContext(reg);
 	}
 
@@ -373,11 +362,11 @@ export function compileProgram(fileNames: string[]): void {
 		 * classes must be named
 		 * class members contain only properties (fields), non-static methods and a single constructor
 		 */
-		let symbol: ts.Symbol = checker.getSymbolAtLocation(cl.name!)!;
-		let type: ts.Type = checker.getDeclaredTypeOfSymbol(symbol);
-		let properties: ts.Symbol[] = checker.getPropertiesOfType(type).filter(sym => sym.flags == ts.SymbolFlags.Property);
-		let propTypes: ts.TypeFlags[] = properties.map(sym => checker.getTypeOfSymbolAtLocation(sym, cl).flags);
-		iBuff.emitStructDefinition(new ib.StructDefinitionInstruction(symbol.name, propTypes));
+		let symbol: ts.Symbol = cgm.checker.getSymbolAtLocation(cl.name!)!;
+		let type: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(symbol);
+		let properties: ts.Symbol[] = cgm.checker.getPropertiesOfType(type).filter(sym => sym.flags == ts.SymbolFlags.Property);
+		let propTypes: ts.TypeFlags[] = properties.map(sym => cgm.checker.getTypeOfSymbolAtLocation(sym, cl).flags);
+		cgm.iBuff.emitStructDefinition(new ib.StructDefinitionInstruction(symbol.name, propTypes));
 		cl.forEachChild(child => {
 			switch (child.kind) {
 				case ts.SyntaxKind.PropertyDeclaration:
@@ -399,22 +388,22 @@ export function compileProgram(fileNames: string[]): void {
 		emitFunctionDeclaration(method, classType);
 		let bpCtx = emitBlock(method.body as ts.FunctionBody);
 		if (!bpCtx.isEmpty()) {
-			let label: number = iBuff.emitNewLabel();
-			iBuff.backPatch(bpCtx.nextList, label);
+			let label: number = cgm.iBuff.emitNewLabel();
+			cgm.iBuff.backPatch(bpCtx.nextList, label);
 		}
-		let retType: ts.Type = checker.getSignatureFromDeclaration(method)!.getReturnType();
+		let retType: ts.Type = cgm.checker.getSignatureFromDeclaration(method)!.getReturnType();
 		if (retType.getFlags() & ts.TypeFlags.Void || method.kind == ts.SyntaxKind.Constructor) {
-			iBuff.emit(new ib.ReturnInstruction(null));
+			cgm.iBuff.emit(new ib.ReturnInstruction(null));
 		}
-		iBuff.emit(new ib.FunctionEndInstruction());
+		cgm.iBuff.emit(new ib.FunctionEndInstruction());
 	}
 
 	function emitBlock(block: ts.BlockLike): StatementCodeGenContext {
 		let bpCtx = new StatementCodeGenContext([]);
 		block.statements.forEach(statement => {
 			if (!bpCtx.isEmpty()){
-				const label = iBuff.emitNewLabel();
-				iBuff.backPatch(bpCtx.nextList, label)
+				const label = cgm.iBuff.emitNewLabel();
+				cgm.iBuff.backPatch(bpCtx.nextList, label)
 			}
 			bpCtx = compileNode(statement) as StatementCodeGenContext;
 		});
@@ -422,16 +411,16 @@ export function compileProgram(fileNames: string[]): void {
 	}
 
 	function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
-		let ptrReg: number = iBuff.getNewReg();
-		let objType: ts.Type = checker.getDeclaredTypeOfSymbol(checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
-		iBuff.emit(new ib.AllocationInstruction(ptrReg, objType));
+		let ptrReg: number = cgm.iBuff.getNewReg();
+		let objType: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(cgm.checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
+		cgm.iBuff.emit(new ib.AllocationInstruction(ptrReg, objType));
 		let paramRegs: ib.TypedReg[] = [];
 		//TODO: wrap this part with 'emitArguments' or something similar and merge with compileNode CallExpression case
 		newExp.arguments?.forEach(exp => {
 			const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
-			let argType = checker.getTypeAtLocation(exp);
+			let argType = cgm.checker.getTypeAtLocation(exp);
 			if (argType.getFlags() == ts.TypeFlags.Any) {
-				argType = checker.getContextualType(exp)!;
+				argType = cgm.checker.getContextualType(exp)!;
 			}
 			paramRegs.push({
 				reg: expCtx.reg, type: argType
@@ -446,38 +435,38 @@ export function compileProgram(fileNames: string[]): void {
 	function emitAssignment(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {
 		let rightCgCtx = compileNode(exp.right) as SavedExpressionCodeGenContext;
 		if (exp.left.kind == ts.SyntaxKind.Identifier) {
-			regMap.set((exp.left as ts.Identifier).getText(), rightCgCtx.reg);
+			cgm.regMap.set((exp.left as ts.Identifier).getText(), rightCgCtx.reg);
 		}
 		else {
 			assert(exp.left.kind == ts.SyntaxKind.PropertyAccessExpression);
 			//TODO: add assertion of the property access being a property and not function
 			let leftCgCtx: SavedExpressionCodeGenContext = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
-			iBuff.emit(new ib.StoreInstruction(leftCgCtx.reg, rightCgCtx.reg, checker.getTypeAtLocation(exp.right)));
+			cgm.iBuff.emit(new ib.StoreInstruction(leftCgCtx.reg, rightCgCtx.reg, cgm.checker.getTypeAtLocation(exp.right)));
 		}
 		return rightCgCtx;
 	}
 
 	function emitGetPropertyAddress(exp: ts.PropertyAccessExpression): SavedExpressionCodeGenContext {
-		let ptrReg: number = iBuff.getNewReg();
+		let ptrReg: number = cgm.iBuff.getNewReg();
 		let objReg: number;
-		let objType: ts.Type = checker.getTypeAtLocation(exp.expression);
-		let objPropNames = checker.getPropertiesOfType(objType).filter(sym => sym.flags == ts.SymbolFlags.Property).map(sym => sym.getName());
+		let objType: ts.Type = cgm.checker.getTypeAtLocation(exp.expression);
+		let objPropNames = cgm.checker.getPropertiesOfType(objType).filter(sym => sym.flags == ts.SymbolFlags.Property).map(sym => sym.getName());
 		let propIndex: number = objPropNames.indexOf(exp.name.getText());
 		if (exp.expression.kind == ts.SyntaxKind.ThisKeyword) {
-			objReg = regMap.get('this')!;
+			objReg = cgm.regMap.get('this')!;
 		}
 		else {
-			objReg = regMap.get((exp.expression as ts.Identifier).getText())!;
+			objReg = cgm.regMap.get((exp.expression as ts.Identifier).getText())!;
 		}
-		iBuff.emit(new ib.GetElementInstruction(ptrReg, objReg, objType, propIndex))
+		cgm.iBuff.emit(new ib.GetElementInstruction(ptrReg, objReg, objType, propIndex))
 		return new SavedExpressionCodeGenContext(ptrReg);
 	}
 
 	function emitLoadProperty(exp: ts.PropertyAccessExpression): SavedExpressionCodeGenContext {
 		let addressCgCtx = emitGetPropertyAddress(exp);
-		let resReg = iBuff.getNewReg();
-		let valType: ts.Type = checker.getTypeAtLocation(exp);
-		iBuff.emit(new ib.LoadInstruction(addressCgCtx.reg, resReg, valType))
+		let resReg = cgm.iBuff.getNewReg();
+		let valType: ts.Type = cgm.checker.getTypeAtLocation(exp);
+		cgm.iBuff.emit(new ib.LoadInstruction(addressCgCtx.reg, resReg, valType))
 		return new SavedExpressionCodeGenContext(resReg);
 	}
 }

@@ -3,12 +3,12 @@ import { assert } from "console";
 import * as ts from "typescript";
 
 import * as cgm from "./manager.js"
-import * as ib from "../instruction_buffer.js";
+import * as inst from "../ir/instructions";
 
 class StatementCodeGenContext {
-	public nextList: ib.BpEntry[] = [];
+	public nextList: inst.BpEntry[] = [];
 
-	constructor(nextList: ib.BpEntry[]) {
+	constructor(nextList: inst.BpEntry[]) {
 		this.nextList = nextList;
 	}
 
@@ -35,10 +35,10 @@ class UnsavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 	readonly isValueSaved: boolean = false;
 	readonly typeFlags: ts.TypeFlags = ts.TypeFlags.Boolean;
 
-	public trueList: ib.BpEntry[] = [];
-	public falseList: ib.BpEntry[] = [];
+	public trueList: inst.BpEntry[] = [];
+	public falseList: inst.BpEntry[] = [];
 
-	constructor(trueList: ib.BpEntry[], falseList: ib.BpEntry[]) {
+	constructor(trueList: inst.BpEntry[], falseList: inst.BpEntry[]) {
 		this.trueList = trueList;
 		this.falseList = falseList;
 	}
@@ -107,7 +107,7 @@ export function compileProgram(fileNames: string[]): void {
 				let callExp = node as ts.CallExpression;
 				let funcName = "";
 
-				let paramRegs: ib.TypedReg[] = [];
+				let paramRegs: inst.TypedReg[] = [];
 				callExp.arguments.forEach(exp => {
 					const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
 					let argType = cgm.checker.getTypeAtLocation(exp);
@@ -174,7 +174,7 @@ export function compileProgram(fileNames: string[]): void {
 
 			case ts.SyntaxKind.ReturnStatement:
 				const retStat = node as ts.ReturnStatement;
-				let retInst: ib.ReturnInstruction;
+				let retInst: inst.ReturnInstruction;
 				if (retStat.expression) {
 					const expCtx = compileNode(retStat.expression) as ExpressionCodeGenContext;
 					let retReg: number;
@@ -185,10 +185,10 @@ export function compileProgram(fileNames: string[]): void {
 						retReg = (expCtx as SavedExpressionCodeGenContext).reg;
 					}
 					let retType = cgm.checker.getTypeAtLocation(retStat.expression);
-					retInst = new ib.ReturnInstruction(retType, retReg);
+					retInst = new inst.ReturnInstruction(retType, retReg);
 				}
 				else {
-					retInst = new ib.ReturnInstruction(null);
+					retInst = new inst.ReturnInstruction(null);
 				}
 				cgm.iBuff.emit(retInst);
 				return new StatementCodeGenContext([]);
@@ -205,10 +205,10 @@ export function compileProgram(fileNames: string[]): void {
 				compileNode(fun.body!);
 				//TODO: make this if more readable
 				if ( cgm.checker.getReturnTypeOfSignature(cgm.checker.getSignatureFromDeclaration(fun)!).flags & ts.TypeFlags.Void) {
-					cgm.iBuff.emit(new ib.ReturnInstruction(null));
+					cgm.iBuff.emit(new inst.ReturnInstruction(null));
 				}
 
-				cgm.iBuff.emit(new ib.FunctionEndInstruction());
+				cgm.iBuff.emit(new inst.FunctionEndInstruction());
 				return new StatementCodeGenContext([]);
 
 			case ts.SyntaxKind.IfStatement:
@@ -272,14 +272,14 @@ export function compileProgram(fileNames: string[]): void {
 			paramTypes.push(cls);
 			cgm.regMap.set('this', -(signature.parameters.length + 1));
 		}
-		cgm.iBuff.emit(new ib.FunctionDeclarationInstruction(id, retType, paramTypes));
+		cgm.iBuff.emit(new inst.FunctionDeclarationInstruction(id, retType, paramTypes));
 	}
 
 	function emitNumericBinaryExpression(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {
 		const leftCtx = compileNode(exp.left) as SavedExpressionCodeGenContext;
 		const rightCtx = compileNode(exp.right) as SavedExpressionCodeGenContext;
 		const resReg = cgm.iBuff.getNewReg();
-		cgm.iBuff.emit(new ib.NumericOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+		cgm.iBuff.emit(new inst.NumericOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
 		return new SavedExpressionCodeGenContext(resReg);
 	}
 
@@ -294,10 +294,10 @@ export function compileProgram(fileNames: string[]): void {
 			case ts.SyntaxKind.EqualsEqualsToken:
 			case ts.SyntaxKind.ExclamationEqualsToken:
 				let resReg = cgm.iBuff.getNewReg();
-				cgm.iBuff.emit(new ib.EqualityOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
-				let brInst = cgm.iBuff.emit(new ib.ConditionalBranchInstruction(resReg));
-				let trueEntry: ib.BpEntry = { instruction: brInst, index: 0 };
-				let falseEntry: ib.BpEntry = { instruction: brInst, index: 1 };
+				cgm.iBuff.emit(new inst.EqualityOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+				let brInst = cgm.iBuff.emit(new inst.ConditionalBranchInstruction(resReg));
+				let trueEntry: inst.BpEntry = { instruction: brInst, index: 0 };
+				let falseEntry: inst.BpEntry = { instruction: brInst, index: 1 };
 				return new UnsavedExpressionCodeGenContext([trueEntry], [falseEntry]);
 				break;
 			default:
@@ -306,13 +306,13 @@ export function compileProgram(fileNames: string[]): void {
 
 	}
 
-	function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: ib.TypedReg[]): SavedExpressionCodeGenContext {
+	function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: inst.TypedReg[]): SavedExpressionCodeGenContext {
 		//TODO: remove allocating new reg for void functions
-		const retReg: ib.TypedReg = {
+		const retReg: inst.TypedReg = {
 			reg: cgm.iBuff.getNewReg(),
 			type: retType
 		};
-		cgm.iBuff.emit(new ib.FunctionCallInstruction(retReg, name, paramRegs));
+		cgm.iBuff.emit(new inst.FunctionCallInstruction(retReg, name, paramRegs));
 		return new SavedExpressionCodeGenContext(retReg.reg);
 	}
 
@@ -321,7 +321,7 @@ export function compileProgram(fileNames: string[]): void {
 		const args = funCall.arguments;
 		let llvmFunName = "";
 		let llvmRetType = null;
-		let llvmArgs: ib.TypedReg[] = [];
+		let llvmArgs: inst.TypedReg[] = [];
 		switch (funName){
 			case "scanf":
 				assert(args.length == 1);
@@ -342,17 +342,17 @@ export function compileProgram(fileNames: string[]): void {
 		}
 
 		//TODO: remove allocating new reg for void functions
-		const llvmRetReg: ib.TypedReg = {
+		const llvmRetReg: inst.TypedReg = {
 			reg: cgm.iBuff.getNewReg(),
 			type: llvmRetType
 		};
-		cgm.iBuff.emit(new ib.FunctionCallInstruction(llvmRetReg, llvmFunName, llvmArgs));
+		cgm.iBuff.emit(new inst.FunctionCallInstruction(llvmRetReg, llvmFunName, llvmArgs));
 		return new SavedExpressionCodeGenContext(llvmRetReg.reg);
 	}
 
 	function emitSaveNumericValue(val: number): SavedExpressionCodeGenContext {
 		const reg = cgm.iBuff.getNewReg();
-		cgm.iBuff.emit(new ib.NumericAssignmentInstruction(reg, val));
+		cgm.iBuff.emit(new inst.NumericAssignmentInstruction(reg, val));
 		return new SavedExpressionCodeGenContext(reg);
 	}
 
@@ -366,7 +366,7 @@ export function compileProgram(fileNames: string[]): void {
 		let type: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(symbol);
 		let properties: ts.Symbol[] = cgm.checker.getPropertiesOfType(type).filter(sym => sym.flags == ts.SymbolFlags.Property);
 		let propTypes: ts.TypeFlags[] = properties.map(sym => cgm.checker.getTypeOfSymbolAtLocation(sym, cl).flags);
-		cgm.iBuff.emitStructDefinition(new ib.StructDefinitionInstruction(symbol.name, propTypes));
+		cgm.iBuff.emitStructDefinition(new inst.StructDefinitionInstruction(symbol.name, propTypes));
 		cl.forEachChild(child => {
 			switch (child.kind) {
 				case ts.SyntaxKind.PropertyDeclaration:
@@ -393,9 +393,9 @@ export function compileProgram(fileNames: string[]): void {
 		}
 		let retType: ts.Type = cgm.checker.getSignatureFromDeclaration(method)!.getReturnType();
 		if (retType.getFlags() & ts.TypeFlags.Void || method.kind == ts.SyntaxKind.Constructor) {
-			cgm.iBuff.emit(new ib.ReturnInstruction(null));
+			cgm.iBuff.emit(new inst.ReturnInstruction(null));
 		}
-		cgm.iBuff.emit(new ib.FunctionEndInstruction());
+		cgm.iBuff.emit(new inst.FunctionEndInstruction());
 	}
 
 	function emitBlock(block: ts.BlockLike): StatementCodeGenContext {
@@ -413,8 +413,8 @@ export function compileProgram(fileNames: string[]): void {
 	function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
 		let ptrReg: number = cgm.iBuff.getNewReg();
 		let objType: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(cgm.checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
-		cgm.iBuff.emit(new ib.AllocationInstruction(ptrReg, objType));
-		let paramRegs: ib.TypedReg[] = [];
+		cgm.iBuff.emit(new inst.AllocationInstruction(ptrReg, objType));
+		let paramRegs: inst.TypedReg[] = [];
 		//TODO: wrap this part with 'emitArguments' or something similar and merge with compileNode CallExpression case
 		newExp.arguments?.forEach(exp => {
 			const expCtx = compileNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
@@ -441,7 +441,7 @@ export function compileProgram(fileNames: string[]): void {
 			assert(exp.left.kind == ts.SyntaxKind.PropertyAccessExpression);
 			//TODO: add assertion of the property access being a property and not function
 			let leftCgCtx: SavedExpressionCodeGenContext = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
-			cgm.iBuff.emit(new ib.StoreInstruction(leftCgCtx.reg, rightCgCtx.reg, cgm.checker.getTypeAtLocation(exp.right)));
+			cgm.iBuff.emit(new inst.StoreInstruction(leftCgCtx.reg, rightCgCtx.reg, cgm.checker.getTypeAtLocation(exp.right)));
 		}
 		return rightCgCtx;
 	}
@@ -458,7 +458,7 @@ export function compileProgram(fileNames: string[]): void {
 		else {
 			objReg = cgm.regMap.get((exp.expression as ts.Identifier).getText())!;
 		}
-		cgm.iBuff.emit(new ib.GetElementInstruction(ptrReg, objReg, objType, propIndex))
+		cgm.iBuff.emit(new inst.GetElementInstruction(ptrReg, objReg, objType, propIndex))
 		return new SavedExpressionCodeGenContext(ptrReg);
 	}
 
@@ -466,7 +466,7 @@ export function compileProgram(fileNames: string[]): void {
 		let addressCgCtx = emitGetPropertyAddress(exp);
 		let resReg = cgm.iBuff.getNewReg();
 		let valType: ts.Type = cgm.checker.getTypeAtLocation(exp);
-		cgm.iBuff.emit(new ib.LoadInstruction(addressCgCtx.reg, resReg, valType))
+		cgm.iBuff.emit(new inst.LoadInstruction(addressCgCtx.reg, resReg, valType))
 		return new SavedExpressionCodeGenContext(resReg);
 	}
 }

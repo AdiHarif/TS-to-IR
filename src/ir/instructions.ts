@@ -285,7 +285,7 @@ export class GetElementSizeInstruction implements Instruction {
 	}
 
 	toLlvm(): string {
-		return regIndexToString(this.resReg) + ' = getelementptr ' + typeToLlvmType(this.objType) + ', ' + typeToLlvmType(this.objType, true) + '* null, i32 1';
+		return regIndexToString(this.resReg) + ' = getelementptr ' + typeToLlvmType(this.objType) + ', ' + typeToLlvmType(this.objType, true) + ' null, i32 1';
 	}
 }
 

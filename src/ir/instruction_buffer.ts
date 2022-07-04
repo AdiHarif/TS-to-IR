@@ -43,6 +43,7 @@ export class InstructionBuffer {
 			'declare double @scand()\n' +
 			'declare void @printd(double)\n' +
 			'declare void @prints(i8*)\n' +
+			'declare i8* @malloc(i32)\n' +
 			'\n'
 		);
 		let code: string = declerations;

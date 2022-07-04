@@ -4,6 +4,7 @@ import * as ts from "typescript";
 
 import * as cgm from "./manager.js"
 import * as inst from "../ir/instructions";
+import { emitObjectAllocationFunctionDefinition } from "./templates.js"
 
 class StatementCodeGenContext {
 	public nextList: inst.BpEntry[] = [];
@@ -367,6 +368,7 @@ export function compileProgram(fileNames: string[]): void {
 		let properties: ts.Symbol[] = cgm.checker.getPropertiesOfType(type).filter(sym => sym.flags == ts.SymbolFlags.Property);
 		let propTypes: ts.TypeFlags[] = properties.map(sym => cgm.checker.getTypeOfSymbolAtLocation(sym, cl).flags);
 		cgm.iBuff.emitStructDefinition(new inst.StructDefinitionInstruction(symbol.name, propTypes));
+		emitObjectAllocationFunctionDefinition(type);
 		cl.forEachChild(child => {
 			switch (child.kind) {
 				case ts.SyntaxKind.PropertyDeclaration:

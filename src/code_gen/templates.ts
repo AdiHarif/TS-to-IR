@@ -5,11 +5,11 @@ import { iBuff } from "./manager.js"
 import * as inst from "../ir/instructions.js"
 
 
-function emitAllocationFunctionDefinition(type: ts.Type): void {
+export function emitObjectAllocationFunctionDefinition(type: ts.Type): void {
 
 	const func_name: string = "allocate_" +  type.getSymbol()!.getName();
 
-	let regs: number[] = Array(4).map((_) => iBuff.getNewReg());
+	let regs: number[] = [...Array(4)].map((_) => iBuff.getNewReg());
 	let template: inst.Instruction[] = [
 		new inst.FunctionDeclarationInstruction(func_name, type, []),
 		new inst.GetElementSizeInstruction(regs[0], type),

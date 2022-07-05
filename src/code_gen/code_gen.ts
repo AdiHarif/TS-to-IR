@@ -147,7 +147,7 @@ export function compileProgram(fileNames: string[]): void {
 					else {
 						funcName =  ((callExp.expression as ts.PropertyAccessExpression).expression as ts.Identifier).getText();
 					}
-					funcName += '.' + (callExp.expression as ts.PropertyAccessExpression).name.getText();
+					funcName += '_' + (callExp.expression as ts.PropertyAccessExpression).name.getText();
 				}
 
 				if (libFunctions.indexOf(funcName) > -1) {
@@ -269,7 +269,7 @@ export function compileProgram(fileNames: string[]): void {
 		}
 
 		if (cls) {
-			id = cls.symbol.getName() + '.' + id;
+			id = cls.symbol.getName() + '_' + id;
 			paramTypes.push(cls);
 			cgm.regMap.set('this', -(signature.parameters.length + 1));
 		}
@@ -429,7 +429,7 @@ export function compileProgram(fileNames: string[]): void {
 			});
 		});
 		paramRegs.push({ reg: ptrReg, type: objType});
-		let funcName: string = objType.getSymbol()!.getName() + '.constructor'
+		let funcName: string = objType.getSymbol()!.getName() + '_constructor'
 		emitFunctionCall(null, funcName, paramRegs);
 		return new SavedExpressionCodeGenContext(ptrReg);
 	}

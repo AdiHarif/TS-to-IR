@@ -208,7 +208,7 @@ export class FunctionCallInstruction implements Instruction {
 	}
 }
 
-export class AllocationInstruction implements Instruction {
+export class ObjectAllocationInstruction implements Instruction {
 	private resReg: number;
 	private type: ts.Type;
 
@@ -219,7 +219,7 @@ export class AllocationInstruction implements Instruction {
 
 
 	toLlvm(): string {
-		return regIndexToString(this.resReg) + ' = alloca %' + this.type.getSymbol()!.getName(); //TODO: implement
+		return regIndexToString(this.resReg) + ' = call ' + typeToLlvmType(this.type, true) + ' () @allocate_' + this.type.getSymbol()!.getName() + '()';
 	}
 }
 

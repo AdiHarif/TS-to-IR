@@ -415,7 +415,7 @@ export function compileProgram(fileNames: string[]): void {
 	function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
 		let ptrReg: number = cgm.iBuff.getNewReg();
 		let objType: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(cgm.checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
-		cgm.iBuff.emit(new inst.AllocationInstruction(ptrReg, objType));
+		cgm.iBuff.emit(new inst.ObjectAllocationInstruction(ptrReg, objType));
 		let paramRegs: inst.TypedReg[] = [];
 		//TODO: wrap this part with 'emitArguments' or something similar and merge with compileNode CallExpression case
 		newExp.arguments?.forEach(exp => {

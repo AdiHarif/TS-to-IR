@@ -4,7 +4,7 @@ import * as ts from "typescript";
 
 import * as cgm from "./manager.js"
 import * as inst from "../ir/instructions";
-import { emitObjectAllocationFunctionDefinition } from "./templates.js"
+import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./templates.js"
 
 class StatementCodeGenContext {
 	public nextList: inst.BpEntry[] = [];
@@ -366,8 +366,14 @@ export function compileProgram(fileNames: string[]): void {
 		let symbol: ts.Symbol = cgm.checker.getSymbolAtLocation(cl.name!)!;
 		let type: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(symbol);
 		let properties: ts.Symbol[] = cgm.checker.getPropertiesOfType(type).filter(sym => sym.flags == ts.SymbolFlags.Property);
-		let propTypes: ts.TypeFlags[] = properties.map(sym => cgm.checker.getTypeOfSymbolAtLocation(sym, cl).flags);
-		cgm.iBuff.emitStructDefinition(new inst.StructDefinitionInstruction(symbol.name, propTypes));
+		let propTypes: ts.Type[] = properties.map(symbol => cgm.checker.getTypeOfSymbolAtLocation(symbol, cl));
+		let propTypeFlags: ts.TypeFlags[] = properties.map(sym => cgm.checker.getTypeOfSymbolAtLocation(sym, cl).flags);
+		for (let i: number = 0; i < properties.length; i++) {
+			emitObjectFieldGetter(type, properties[i], propTypes[i], i);
+			emitObjectFieldSetter(type, properties[i], propTypes[i], i);
+
+		}
+		cgm.iBuff.emitStructDefinition(new inst.StructDefinitionInstruction(symbol.name, propTypeFlags));
 		emitObjectAllocationFunctionDefinition(type);
 		cl.forEachChild(child => {
 			switch (child.kind) {

@@ -260,7 +260,7 @@ export function compileProgram(fileNames: string[]): void {
 		let id: string;
 		let retType: ts.Type | null;
 		if (fun.kind == ts.SyntaxKind.Constructor) {
-			retType = null;
+			retType = cls!;
 			id = 'constructor';
 		}
 		else {
@@ -270,7 +270,9 @@ export function compileProgram(fileNames: string[]): void {
 
 		if (cls) {
 			id = cls.symbol.getName() + '_' + id;
-			paramTypes.push(cls);
+			if (fun.kind != ts.SyntaxKind.Constructor) {
+				paramTypes.push(cls);
+			}
 			cgm.regMap.set('this', -(signature.parameters.length + 1));
 		}
 		cgm.iBuff.emit(new inst.FunctionDeclarationInstruction(id, retType, paramTypes));
@@ -394,13 +396,22 @@ export function compileProgram(fileNames: string[]): void {
 		 * input declaration must be either a ctor or a class method
 		 */
 		emitFunctionDeclaration(method, classType);
+		let ctorRetReg: number = 0;
+		if (method.kind == ts.SyntaxKind.Constructor) {
+			ctorRetReg = cgm.iBuff.getNewReg();
+			cgm.iBuff.emit(new inst.ObjectAllocationInstruction(ctorRetReg, classType));
+			cgm.regMap.set('this', ctorRetReg);
+		}
 		let bpCtx = emitBlock(method.body as ts.FunctionBody);
 		if (!bpCtx.isEmpty()) {
 			let label: number = cgm.iBuff.emitNewLabel();
 			cgm.iBuff.backPatch(bpCtx.nextList, label);
 		}
 		let retType: ts.Type = cgm.checker.getSignatureFromDeclaration(method)!.getReturnType();
-		if (retType.getFlags() & ts.TypeFlags.Void || method.kind == ts.SyntaxKind.Constructor) {
+		if (method.kind == ts.SyntaxKind.Constructor) {
+			cgm.iBuff.emit(new inst.ReturnInstruction(classType, ctorRetReg));
+		}
+		else if (retType.getFlags() & ts.TypeFlags.Void) {
 			cgm.iBuff.emit(new inst.ReturnInstruction(null));
 		}
 		cgm.iBuff.emit(new inst.FunctionEndInstruction());
@@ -419,9 +430,7 @@ export function compileProgram(fileNames: string[]): void {
 	}
 
 	function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
-		let ptrReg: number = cgm.iBuff.getNewReg();
 		let objType: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(cgm.checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
-		cgm.iBuff.emit(new inst.ObjectAllocationInstruction(ptrReg, objType));
 		let paramRegs: inst.TypedReg[] = [];
 		//TODO: wrap this part with 'emitArguments' or something similar and merge with compileNode CallExpression case
 		newExp.arguments?.forEach(exp => {
@@ -434,10 +443,8 @@ export function compileProgram(fileNames: string[]): void {
 				reg: expCtx.reg, type: argType
 			});
 		});
-		paramRegs.push({ reg: ptrReg, type: objType});
 		let funcName: string = objType.getSymbol()!.getName() + '_constructor'
-		emitFunctionCall(null, funcName, paramRegs);
-		return new SavedExpressionCodeGenContext(ptrReg);
+		return emitFunctionCall(objType, funcName, paramRegs);
 	}
 
 	function emitAssignment(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {

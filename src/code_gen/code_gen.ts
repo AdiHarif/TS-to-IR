@@ -1,6 +1,7 @@
 
 import { assert } from "console";
 import * as ts from "typescript";
+import { writeFileSync } from "fs"
 
 import * as cgm from "./manager.js"
 import * as inst from "../ir/instructions";
@@ -52,14 +53,12 @@ const libFunctions = [ //TODO: add printf and remove handling console.log
 	"scanf"
 ];
 
-export function compileProgram(fileNames: string[]): void {
-
-	cgm.InitManager(fileNames);
+export function compileProgram(): void {
 
 	cgm.sourceFiles.forEach(compileNode);
 
 	const outCode = cgm.iBuff.dumpBuffer();
-	console.log(outCode);
+	writeFileSync(cgm.outputFilePath, outCode);
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {

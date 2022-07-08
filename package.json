@@ -18,5 +18,8 @@
   "devDependencies": {
     "@types/node": "^17.0.23",
     "scanf": "^1.1.2"
+  },
+  "dependencies": {
+    "ts-command-line-args": "^2.3.1"
   }
 }

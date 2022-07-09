@@ -1,9 +1,11 @@
 
-import { Instruction, StructDefinitionInstruction, LabelInstruction, PatchableInstruction, BpEntry, FunctionDefinitionInstruction, FunctionEndInstruction } from "./instructions.js"
+//TODO: cleanup this import
+import { Instruction, StructDefinitionInstruction, LabelInstruction, PatchableInstruction, BpEntry, FunctionDefinitionInstruction, FunctionDeclarationInstruction, FunctionEndInstruction } from "./instructions.js"
 export class InstructionBuffer {
-	private codeBuffer: Instruction[] = [];
+	private declarationsBuffer: FunctionDeclarationInstruction[] = [];
 	private dataBuffer: Instruction[] = [];
 	private structsBuffer: StructDefinitionInstruction[] = [];
+	private codeBuffer: Instruction[] = [];
 	private regCount: number = 0;
 
 	constructor() {}
@@ -11,6 +13,10 @@ export class InstructionBuffer {
 	emit(inst: Instruction): number {
 		this.codeBuffer.push(inst);
 		return this.codeBuffer.length - 1;
+	}
+
+	emitFunctionDeclaration(inst: FunctionDeclarationInstruction): void {
+		this.declarationsBuffer.push(inst);
 	}
 
 	emitData(inst: Instruction): number {
@@ -47,6 +53,8 @@ export class InstructionBuffer {
 			'\n'
 		);
 		let code: string = declerations;
+		this.declarationsBuffer.forEach(instruction => code += instruction.toLlvm() + '\n');
+		code += '\n';
 		this.dataBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
 		this.structsBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
 		this.codeBuffer.forEach(instruction => {

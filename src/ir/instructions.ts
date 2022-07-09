@@ -45,6 +45,29 @@ export class FunctionDefinitionInstruction implements Instruction {
 	}
 }
 
+export class FunctionDeclarationInstruction implements Instruction {
+	//TODO: merge with FuntionDefinitionInstruction
+	private id: string;
+	private retType: ts.Type | null;
+	private paramTypes: ts.Type[];
+
+	constructor(id: string, retType: ts.Type | null, paramTypes: ts.Type[]) {
+		this.id = id;
+		this.retType = retType;
+		this.paramTypes = paramTypes;
+	}
+	toLlvm(): string {
+		let out = "declare " + typeToLlvmType(this.retType, true) + " @" + this.id + "(";
+		for (let i = 0; i < this.paramTypes.length; i++) {
+			if (i != 0) {
+				out += ", ";
+			}
+			out += typeToLlvmType(this.paramTypes[i], true);
+		}
+		out += ")";
+		return out;
+	}
+}
 export class FunctionEndInstruction implements Instruction {
 	toLlvm(): string {
 		return "}\n";

@@ -53,6 +53,9 @@ const libFunctions = [ //TODO: add printf and remove handling console.log
 	"scanf"
 ];
 
+//TODO: find a more suitable place for this list.
+let importedFunctions: string[] = [];
+
 export function compileProgram(): void {
 
 	cgm.sourceFiles.forEach(compileNode);
@@ -138,6 +141,7 @@ export function compileProgram(): void {
 					}
 				}
 				else {
+					let imported: boolean = false;
 					if ((callExp.expression as ts.PropertyAccessExpression).expression.kind == ts.SyntaxKind.ThisKeyword) {
 						let objType: ts.Type = cgm.checker.getTypeAtLocation((callExp.expression as ts.PropertyAccessExpression).expression);
 						funcName =  objType.getSymbol()!.getName();
@@ -145,8 +149,14 @@ export function compileProgram(): void {
 					}
 					else {
 						funcName =  ((callExp.expression as ts.PropertyAccessExpression).expression as ts.Identifier).getText();
+						imported = true;
 					}
 					funcName += '_' + (callExp.expression as ts.PropertyAccessExpression).name.getText();
+					if (imported && (importedFunctions.indexOf(funcName) == -1) ) {
+						importedFunctions.push(funcName);
+						let paramTypes: ts.Type[] = paramRegs.map(reg => reg.type as ts.Type);
+						cgm.iBuff.emitFunctionDeclaration(new inst.FunctionDeclarationInstruction(funcName, retType, paramTypes))
+					}
 				}
 
 				if (libFunctions.indexOf(funcName) > -1) {

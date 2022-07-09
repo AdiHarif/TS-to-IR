@@ -11,7 +11,7 @@ export function emitObjectAllocationFunctionDefinition(type: ts.Type): void {
 
 	let regs: number[] = [...Array(4)].map((_) => iBuff.getNewReg());
 	let template: inst.Instruction[] = [
-		new inst.FunctionDeclarationInstruction(func_name, type, []),
+		new inst.FunctionDefinitionInstruction(func_name, type, []),
 		new inst.GetElementSizeInstruction(regs[0], type),
 		new inst.PtrToIntInstruction(regs[1], regs[0], type),
 		new inst.DynamicAllocationInstruction(regs[2], regs[1]),
@@ -30,7 +30,7 @@ export function emitObjectFieldGetter(objType: ts.Type, fieldSymbol: ts.Symbol, 
 	//TODO: add a reg allocation function instead of this line
 	let regs: number[] = [...Array(2)].map((_) => iBuff.getNewReg());
 	let template: inst.Instruction[] = [
-		new inst.FunctionDeclarationInstruction(func_name, fieldType, [objType]),
+		new inst.FunctionDefinitionInstruction(func_name, fieldType, [objType]),
 		new inst.GetElementInstruction(regs[0], -1, objType, index),
 		new inst.LoadInstruction(regs[0], regs[1], fieldType),
 		new inst.ReturnInstruction(fieldType, regs[1]),
@@ -47,7 +47,7 @@ export function emitObjectFieldSetter(objType: ts.Type, fieldSymbol: ts.Symbol, 
 	//TODO: add a reg allocation function instead of this line
 	let reg: number = iBuff.getNewReg();
 	let template: inst.Instruction[] = [
-		new inst.FunctionDeclarationInstruction(func_name, null, [fieldType, objType]),
+		new inst.FunctionDefinitionInstruction(func_name, null, [fieldType, objType]),
 		new inst.GetElementInstruction(reg, -2, objType, index),
 		new inst.StoreInstruction(reg, -1, fieldType),
 		new inst.ReturnInstruction(null),

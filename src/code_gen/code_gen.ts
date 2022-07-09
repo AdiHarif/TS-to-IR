@@ -274,7 +274,7 @@ export function compileProgram(): void {
 			}
 			cgm.regMap.set('this', -(signature.parameters.length + 1));
 		}
-		cgm.iBuff.emit(new inst.FunctionDeclarationInstruction(id, retType, paramTypes));
+		cgm.iBuff.emit(new inst.FunctionDefinitionInstruction(id, retType, paramTypes));
 	}
 
 	function emitNumericBinaryExpression(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {

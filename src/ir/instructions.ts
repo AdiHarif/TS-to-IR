@@ -21,7 +21,7 @@ export interface PatchableInstruction extends Instruction {
 	patch(label: number, index: 0 | 1): void;
 }
 
-export class FunctionDeclarationInstruction implements Instruction {
+export class FunctionDefinitionInstruction implements Instruction {
 	private id: string;
 	private retType: ts.Type | null;
 	private paramTypes: ts.Type[];

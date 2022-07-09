@@ -1,5 +1,5 @@
 
-import { Instruction, StructDefinitionInstruction, LabelInstruction, PatchableInstruction, BpEntry, FunctionDeclarationInstruction, FunctionEndInstruction } from "./instructions.js"
+import { Instruction, StructDefinitionInstruction, LabelInstruction, PatchableInstruction, BpEntry, FunctionDefinitionInstruction, FunctionEndInstruction } from "./instructions.js"
 export class InstructionBuffer {
 	private codeBuffer: Instruction[] = [];
 	private dataBuffer: Instruction[] = [];
@@ -50,7 +50,7 @@ export class InstructionBuffer {
 		this.dataBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
 		this.structsBuffer.forEach(instruction => code = code + instruction.toLlvm() + '\n');
 		this.codeBuffer.forEach(instruction => {
-			if (!((instruction instanceof FunctionDeclarationInstruction) ||
+			if (!((instruction instanceof FunctionDefinitionInstruction) ||
 			      (instruction instanceof FunctionEndInstruction))) {
 				code += "\t";
 			}

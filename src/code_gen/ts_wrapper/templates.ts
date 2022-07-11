@@ -201,3 +201,46 @@ export function createLoadModuleStatements(moduleName: string, imports: ts.Prope
 		loadModuleCallStatement
 	];
 }
+
+export function createWrapTwinObjectDeclaration(type: ts.Type): ts.FunctionDeclaration {
+
+	const typeName: string = type.getSymbol()!.getName();
+
+	let wrapTwinObjectDeclaration = ts.factory.createFunctionDeclaration(
+		undefined,
+		undefined,
+		undefined,
+		'wrapTwinObject',
+		undefined,
+		[ ts.factory.createParameterDeclaration(
+			undefined,
+			undefined,
+			undefined,
+			'obj',
+			undefined,
+			ts.factory.createTypeReferenceNode('number')
+		)],
+		ts.factory.createTypeReferenceNode(typeName),
+		ts.factory.createBlock(
+			[ ts.factory.createReturnStatement(ts.factory.createAsExpression(
+				ts.factory.createObjectLiteralExpression(
+					[
+						ts.factory.createPropertyAssignment(
+							'twinObj',
+							ts.factory.createIdentifier('obj')
+						),
+						ts.factory.createSpreadAssignment(ts.factory.createPropertyAccessExpression(
+							ts.factory.createIdentifier(typeName),
+							'prototype'
+						))
+					],
+					true
+				),
+				ts.factory.createTypeReferenceNode(typeName)
+			))],
+			true
+		)
+	);
+
+	return wrapTwinObjectDeclaration;
+}

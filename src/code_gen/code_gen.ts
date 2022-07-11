@@ -6,7 +6,7 @@ import { assert } from "console";
 import * as cgm from "./manager.js"
 import * as inst from "../ir/instructions";
 import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./templates.js"
-import { createLoadModuleStatements } from "./ts_wrapper/templates.js";
+import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts_wrapper/templates.js";
 
 class StatementCodeGenContext {
 	public nextList: inst.BpEntry[] = [];
@@ -416,6 +416,7 @@ export function compileProgram(): void {
 					break;
 			}
 		})
+		wrapperStatements.push(createWrapTwinObjectDeclaration(type));
 		return new StatementCodeGenContext([]);
 	}
 

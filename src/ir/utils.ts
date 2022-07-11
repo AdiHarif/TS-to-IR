@@ -1,6 +1,8 @@
 
 import * as ts from "typescript";
 
+import * as cgm from "../code_gen/manager.js"
+
 export function typeToLlvmType(type: ts.Type | null, forceObjPtr: boolean = false): string {
 	if (type == null) {
 		return typeFlagsToLlvmType(ts.TypeFlags.Void);
@@ -45,4 +47,8 @@ export function labelIndexToString(label: number): string {
 
 export function expressionIrName(exp: ts.PropertyAccessExpression): string {
 	return exp.expression.getText() + '_' + exp.name.getText();
+}
+
+export function methodDeclarationToIrName(decl: ts.MethodDeclaration): string {
+	return `${(decl.parent as ts.ClassDeclaration).name!.getText()}_${decl.name!.getText()}`
 }

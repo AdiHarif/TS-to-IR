@@ -1,11 +1,12 @@
 
-import { assert } from "console";
 import * as ts from "typescript";
-import { writeFileSync } from "fs"
+import { writeFileSync } from "fs";
+import { assert } from "console";
 
 import * as cgm from "./manager.js"
 import * as inst from "../ir/instructions";
 import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./templates.js"
+import { createLoadModuleStatements } from "./ts_wrapper/templates.js";
 
 class StatementCodeGenContext {
 	public nextList: inst.BpEntry[] = [];
@@ -56,12 +57,26 @@ const libFunctions = [ //TODO: add printf and remove handling console.log
 //TODO: find a more suitable place for this list.
 let importedFunctions: string[] = [];
 
+//TODO: merge with importedFunctions (maybe wrap with an imports class?) and make more general
+let importedFunctionsNodes: ts.PropertyAccessExpression[] = []
+
+//TODO: embed these statements in the codegen ctx
+export let wrapperStatements: ts.Statement[] = [];
+
 export function compileProgram(): void {
 
 	cgm.sourceFiles.forEach(compileNode);
 
 	const outCode = cgm.iBuff.dumpBuffer();
-	writeFileSync(cgm.outputFilePath, outCode);
+	writeFileSync(cgm.irOutputPath, outCode);
+
+	const file = ts.factory.createSourceFile(
+		wrapperStatements,
+		ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
+		ts.NodeFlags.None
+	);
+
+	writeFileSync(cgm.wrapperOutputPath, cgm.printer.printFile(file));
 
 	function compileNode(node: ts.Node): CodeGenContext {
 		switch (node.kind) {
@@ -154,6 +169,7 @@ export function compileProgram(): void {
 					funcName += '_' + (callExp.expression as ts.PropertyAccessExpression).name.getText();
 					if (imported && (importedFunctions.indexOf(funcName) == -1) ) {
 						importedFunctions.push(funcName);
+						importedFunctionsNodes.push(callExp.expression as ts.PropertyAccessExpression);
 						let paramTypes: ts.Type[] = paramRegs.map(reg => reg.type as ts.Type);
 						cgm.iBuff.emitFunctionDeclaration(new inst.FunctionDeclarationInstruction(funcName, retType, paramTypes))
 					}
@@ -205,6 +221,10 @@ export function compileProgram(): void {
 
 			case ts.SyntaxKind.SourceFile:
 				//TODO: implement adding main function with script statements (outside functions)
+				//TODO: emit the ts wrapper conditionaly
+				emitBlock(node as ts.Block);
+				wrapperStatements.push(...createLoadModuleStatements('Vector2D.wasm', importedFunctionsNodes));
+				return new StatementCodeGenContext([]);
 			case ts.SyntaxKind.Block:
 				return emitBlock(node as ts.Block);
 

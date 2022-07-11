@@ -116,3 +116,5 @@ res/Fireworks/build/*.js
 res/Fireworks/build/*.js.map
 
 utils/*.js
+
+out/

@@ -42,3 +42,7 @@ export function regIndexToString(reg: number): string {
 export function labelIndexToString(label: number): string {
 	return "%l" + label.toString()
 }
+
+export function expressionIrName(exp: ts.PropertyAccessExpression): string {
+	return exp.expression.getText() + '_' + exp.name.getText();
+}

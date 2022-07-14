@@ -229,9 +229,13 @@ export function createWrapTwinObjectDeclaration(type: ts.Type): ts.FunctionDecla
 							'twinObj',
 							ts.factory.createIdentifier('obj')
 						),
-						ts.factory.createSpreadAssignment(ts.factory.createPropertyAccessExpression(
-							ts.factory.createIdentifier(typeName),
-							'prototype'
+						ts.factory.createSpreadAssignment(ts.factory.createCallExpression(
+							ts.factory.createPropertyAccessExpression(
+								ts.factory.createIdentifier('Object'),
+								'getPrototypeOf'
+							),
+							undefined,
+							[ ts.factory.createIdentifier(typeName) ]
 						))
 					],
 					true

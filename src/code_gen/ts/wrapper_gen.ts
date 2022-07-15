@@ -2,7 +2,7 @@
 import * as ts from 'typescript'
 
 import * as cgm from '../manager.js'
-import { methodDeclarationToIrName } from '../../ir/utils';
+import { methodDeclarationToIrName } from '../llvm/utils';
 
 export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.MethodDeclaration {
 

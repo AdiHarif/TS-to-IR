@@ -1,8 +1,8 @@
 
 import * as ts from "typescript";
 
-import { iBuff, checker } from "./manager.js"
-import * as inst from "../ir/instructions.js"
+import { iBuff, checker } from "../manager.js"
+import * as inst from "./instructions.js"
 
 
 export function emitObjectAllocationFunctionDefinition(type: ts.Type): void {

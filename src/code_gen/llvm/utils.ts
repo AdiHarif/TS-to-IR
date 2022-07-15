@@ -1,7 +1,7 @@
 
 import * as ts from "typescript";
 
-import * as cgm from "../code_gen/manager.js"
+import * as cgm from "../manager.js"
 
 export function typeToLlvmType(type: ts.Type | null, forceObjPtr: boolean = false): string {
 	if (type == null) {

@@ -2,7 +2,7 @@
 import * as ts from "typescript";
 import * as path from "node:path"
 
-import * as ib from "../ir/instruction_buffer.js"
+import * as ib from "./llvm/instruction_buffer.js"
 
 export let sourceFiles: readonly ts.SourceFile[] = [];
 export let checker: ts.TypeChecker;

@@ -1,7 +1,7 @@
 
 import * as ts from "typescript"
 
-import { expressionIrName } from "../../ir/utils";
+import { expressionIrName } from "../llvm/utils";
 
 export function createLoadModuleDeclaration(moduleName: string, imports: ts.PropertyAccessExpression[]): ts.FunctionDeclaration {
 

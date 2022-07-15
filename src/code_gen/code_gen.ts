@@ -4,10 +4,10 @@ import { writeFileSync } from "fs";
 import { assert } from "console";
 
 import * as cgm from "./manager.js"
-import * as inst from "../ir/instructions";
-import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./templates.js"
-import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts_wrapper/templates.js";
-import { createWrapperClassDecleration, createWrapperConstructorDeclaration, createWrapperGetter, createWrapperSetter, createWrapperMethodDeclaration } from "./ts_wrapper/wrapper_gen.js";
+import * as inst from "./llvm/instructions";
+import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./llvm/templates.js"
+import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts/templates.js";
+import { createWrapperClassDecleration, createWrapperConstructorDeclaration, createWrapperGetter, createWrapperSetter, createWrapperMethodDeclaration } from "./ts/wrapper_gen.js";
 
 class StatementCodeGenContext {
 	public nextList: inst.BpEntry[] = [];

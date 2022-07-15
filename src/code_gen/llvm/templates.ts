@@ -1,11 +1,11 @@
 
 import * as ts from "typescript";
 
-import { iBuff, checker } from "../manager.js"
 import * as inst from "./instructions.js"
+import * as ib from "./instruction_buffer"
 
 
-export function emitObjectAllocationFunctionDefinition(type: ts.Type): void {
+export function emitObjectAllocationFunctionDefinition(type: ts.Type, iBuff: ib.InstructionBuffer): void {
 
 	const func_name: string = "allocate_" +  type.getSymbol()!.getName();
 
@@ -23,7 +23,7 @@ export function emitObjectAllocationFunctionDefinition(type: ts.Type): void {
 	template.forEach((inst) => iBuff.emit(inst));
 }
 
-export function emitObjectFieldGetter(objType: ts.Type, fieldSymbol: ts.Symbol, fieldType: ts.Type, index: number): void {
+export function emitObjectFieldGetter(objType: ts.Type, fieldSymbol: ts.Symbol, fieldType: ts.Type, index: number, iBuff: ib.InstructionBuffer): void {
 
 	const func_name: string = 'get_' + fieldSymbol.getName() + '_' + objType.getSymbol()!.getName();
 
@@ -40,7 +40,7 @@ export function emitObjectFieldGetter(objType: ts.Type, fieldSymbol: ts.Symbol, 
 	template.forEach((inst) => iBuff.emit(inst));
 }
 
-export function emitObjectFieldSetter(objType: ts.Type, fieldSymbol: ts.Symbol, fieldType: ts.Type, index: number): void {
+export function emitObjectFieldSetter(objType: ts.Type, fieldSymbol: ts.Symbol, fieldType: ts.Type, index: number, iBuff: ib.InstructionBuffer): void {
 
 	const func_name: string = 'set_' + fieldSymbol.getName() + '_' + objType.getSymbol()!.getName();
 

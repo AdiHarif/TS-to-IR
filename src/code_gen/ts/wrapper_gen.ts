@@ -1,10 +1,9 @@
 
 import * as ts from 'typescript'
 
-import * as cgm from '../manager.js'
 import { methodDeclarationToIrName } from '../llvm/utils';
 
-export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.MethodDeclaration {
+export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration, checker: ts.TypeChecker): ts.MethodDeclaration {
 
 	let className: string = (decl.parent as ts.ClassDeclaration).name!.getText();
 
@@ -20,8 +19,8 @@ export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.M
 		[
 			...decl.parameters.map((param) => {
 				let paramName: string = param.name.getText();
-				let paramType: ts.Type = cgm.checker.getTypeAtLocation(param);
-				let paramTypeName: string = cgm.checker.typeToString(paramType);
+				let paramType: ts.Type = checker.getTypeAtLocation(param);
+				let paramTypeName: string = checker.typeToString(paramType);
 				if (paramTypeName == className) {
 					return ts.factory.createPropertyAccessExpression(
 						ts.factory.createIdentifier(paramName),
@@ -38,9 +37,9 @@ export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.M
 	);
 
 	let bodyStatement: ts.Statement;
-	let retType: ts.Type = cgm.checker.getReturnTypeOfSignature(cgm.checker.getSignatureFromDeclaration(decl)!);
+	let retType: ts.Type = checker.getReturnTypeOfSignature(checker.getSignatureFromDeclaration(decl)!);
 	if (!(retType.getFlags() & ts.TypeFlags.Void)) {
-		let retTypeName: string = cgm.checker.typeToString(retType);
+		let retTypeName: string = checker.typeToString(retType);
 		if (retTypeName == className) {
 			bodyCallExpression = ts.factory.createCallExpression(
 				ts.factory.createIdentifier('wrapTwinObject'),
@@ -79,7 +78,7 @@ export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.M
 	return methodMethodWrapper;
 }
 
-export function createWrapperConstructorDeclaration(decl: ts.ConstructorDeclaration): ts.ConstructorDeclaration {
+export function createWrapperConstructorDeclaration(decl: ts.ConstructorDeclaration, checker: ts.TypeChecker): ts.ConstructorDeclaration {
 	//TODO: merge with createWrapperMethodDeclaration
 	const className: string = (decl.parent as ts.ClassDeclaration).name!.getText();
 	const ctorName: string = `${className}_constructor`;
@@ -101,8 +100,8 @@ export function createWrapperConstructorDeclaration(decl: ts.ConstructorDeclarat
 			undefined,
 			decl.parameters.map((param) => {
 				let paramName: string = param.name.getText();
-				let paramType: ts.Type = cgm.checker.getTypeAtLocation(param);
-				let paramTypeName: string = cgm.checker.typeToString(paramType);
+				let paramType: ts.Type = checker.getTypeAtLocation(param);
+				let paramTypeName: string = checker.typeToString(paramType);
 				if (paramTypeName == className) {
 					return ts.factory.createPropertyAccessExpression(
 						ts.factory.createIdentifier(paramName),

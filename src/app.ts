@@ -1,12 +1,12 @@
 
 import { compileProgram } from "./code_gen/code_gen.js"
-import * as cgm from "./code_gen/manager.js"
+import * as gctx from "./code_gen/global_ctx.js"
 import * as cmd from "./cmd_line"
 
 function main(): void {
 	const args = cmd.parseCommandLineArgs();
-	cgm.InitManager(args.sourceFile, args.outputFolder);
-	compileProgram();
+	const globalCtx = new gctx.GlobalCtx(args);
+	compileProgram(globalCtx.getSourceFile(), globalCtx);
 }
 
 main();

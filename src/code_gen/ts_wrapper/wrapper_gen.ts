@@ -156,3 +156,85 @@ export function createWrapperClassDecleration(className: string, members: ts.Cla
 
 	return wrapperClassDecleration;
 }
+
+export function createWrapperGetter(decl: ts.PropertyDeclaration): ts.AccessorDeclaration {
+
+	let propName: string = decl.name.getText();
+	let wasmGetterName: string = `get_${propName}_${decl.parent.name!.getText()}`;
+
+	let bodyStatement = ts.factory.createReturnStatement(ts.factory.createCallExpression(
+		ts.factory.createParenthesizedExpression(ts.factory.createAsExpression(
+			ts.factory.createPropertyAccessExpression(
+				ts.factory.createIdentifier('moduleExports'),
+				wasmGetterName
+			),
+			ts.factory.createTypeReferenceNode('Function')
+		)),
+		undefined,
+		[ ts.factory.createPropertyAccessExpression(
+			ts.factory.createToken(ts.SyntaxKind.ThisKeyword),
+			'twinObj'
+		)]
+	));
+
+	let wrapperGetter = ts.factory.createGetAccessorDeclaration(
+		undefined,
+		undefined,
+		propName,
+		[],
+		ts.factory.createTypeReferenceNode(decl.type!.getText()),
+		ts.factory.createBlock(
+			[ bodyStatement ],
+			true
+		)
+	);
+
+	return wrapperGetter;
+}
+
+export function createWrapperSetter(decl: ts.PropertyDeclaration): ts.AccessorDeclaration {
+
+	let propName: string = decl.name.getText();
+	let wasmSetterName: string = `set_${propName}_${decl.parent.name!.getText()}`;
+
+	let bodyStatement = ts.factory.createExpressionStatement(ts.factory.createCallExpression(
+		ts.factory.createParenthesizedExpression(ts.factory.createAsExpression(
+			ts.factory.createPropertyAccessExpression(
+				ts.factory.createIdentifier('moduleExports'),
+				wasmSetterName
+			),
+			ts.factory.createTypeReferenceNode('Function')
+		)),
+		undefined,
+		[
+			ts.factory.createIdentifier(propName),
+			ts.factory.createPropertyAccessExpression(
+				ts.factory.createToken(ts.SyntaxKind.ThisKeyword),
+				'twinObj'
+			)
+		]
+	));
+
+	let wrapperSetter = ts.factory.createSetAccessorDeclaration(
+		undefined,
+		undefined,
+		propName,
+		[ ts.factory.createParameterDeclaration(
+			undefined,
+			undefined,
+			undefined,
+			propName,
+			undefined,
+			ts.factory.createTypeReferenceNode(decl.type!.getText()),
+			undefined,
+		)],
+		ts.factory.createBlock(
+			[ bodyStatement ],
+			true
+		)
+	);
+
+	return wrapperSetter;
+}
+
+

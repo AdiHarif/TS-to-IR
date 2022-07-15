@@ -7,7 +7,7 @@ import * as cgm from "./manager.js"
 import * as inst from "../ir/instructions";
 import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./templates.js"
 import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts_wrapper/templates.js";
-import { createWrapperClassDecleration, createWrapperConstructorDeclaration, createWrapperMethodDeclaration } from "./ts_wrapper/wrapper_gen.js";
+import { createWrapperClassDecleration, createWrapperConstructorDeclaration, createWrapperGetter, createWrapperSetter, createWrapperMethodDeclaration } from "./ts_wrapper/wrapper_gen.js";
 
 class StatementCodeGenContext {
 	public nextList: inst.BpEntry[] = [];
@@ -411,6 +411,8 @@ export function compileProgram(): void {
 		cl.forEachChild(child => {
 			switch (child.kind) {
 				case ts.SyntaxKind.PropertyDeclaration:
+					wrapperClassMembers.push(createWrapperGetter(child as ts.PropertyDeclaration));
+					wrapperClassMembers.push(createWrapperSetter(child as ts.PropertyDeclaration));
 					break;
 				case ts.SyntaxKind.Constructor:
 					emitClassMethod(child as ts.FunctionLikeDeclaration, type);

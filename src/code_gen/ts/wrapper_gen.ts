@@ -240,4 +240,10 @@ export function createWrapperSetter(decl: ts.PropertyDeclaration): ts.AccessorDe
 	return wrapperSetter;
 }
 
-
+export function createWrapperSourceFile(statements: ts.Statement[]): ts.SourceFile {
+	return ts.factory.createSourceFile(
+		statements,
+		ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
+		ts.NodeFlags.None
+	);
+}

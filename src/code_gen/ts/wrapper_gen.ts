@@ -147,7 +147,7 @@ export function createWrapperClassDecleration(className: string, members: ts.Cla
 
 	let wrapperClassDecleration = ts.factory.createClassDeclaration(
 		undefined,
-		undefined,
+		[ ts.factory.createModifier(ts.SyntaxKind.ExportKeyword) ],
 		className,
 		undefined,
 		undefined,

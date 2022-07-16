@@ -51,10 +51,6 @@ class UnsavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 
 type CodeGenContext = StatementCodeGenContext | ExpressionCodeGenContext;
 
-const libFunctions = [ //TODO: add printf and remove handling console.log
-	"scanf"
-];
-
 //TODO: find a more suitable place for this list.
 let importedFunctions: string[] = [];
 
@@ -148,40 +144,6 @@ function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: inst
 	};
 	cgm.iBuff.emit(new inst.FunctionCallInstruction(retReg, name, paramRegs));
 	return new SavedExpressionCodeGenContext(retReg.reg);
-}
-
-function emitLibFuncitonCall(funCall: ts.CallExpression): SavedExpressionCodeGenContext {
-	const funName = (funCall.expression as ts.Identifier).getText();
-	const args = funCall.arguments;
-	let llvmFunName = "";
-	let llvmRetType = null;
-	let llvmArgs: inst.TypedReg[] = [];
-	switch (funName){
-		case "scanf":
-			assert(args.length == 1);
-			const format = args[0].getText();
-			switch (format) {
-				case '\"%f\"':
-				case '\"%lf\"':
-				case '\"%d\"':
-					llvmFunName = "scand";
-					llvmRetType = null; //TODO: restore this to be number type
-					break;
-				default:
-					throw new Error("unsupported scanf format: " + format);
-			}
-			break;
-		default:
-			throw new Error("")
-	}
-
-	//TODO: remove allocating new reg for void functions
-	const llvmRetReg: inst.TypedReg = {
-		reg: cgm.iBuff.getNewReg(),
-		type: llvmRetType
-	};
-	cgm.iBuff.emit(new inst.FunctionCallInstruction(llvmRetReg, llvmFunName, llvmArgs));
-	return new SavedExpressionCodeGenContext(llvmRetReg.reg);
 }
 
 function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
@@ -496,22 +458,8 @@ function processCallExpression(callExpression: ts.CallExpression): number {
 	});
 
 	let retType: ts.Type | null = cgm.checker.getTypeAtLocation(callExpression);
-	//TODO: remove handling console.log and replace with printf
 	if (callExpression.expression.kind == ts.SyntaxKind.Identifier) {
 		funcName = (callExpression.expression as ts.Identifier).text;
-	}
-	else if (callExpression.expression.kind == ts.SyntaxKind.PropertyAccessExpression &&
-		 callExpression.expression.getText() == "console.log") {
-
-		retType = null;
-		//TODO: handle multiple arguments and other argument types
-		let argType = cgm.checker.getTypeAtLocation(callExpression.arguments[0]).flags;
-		if (argType & ts.TypeFlags.String) {
-			funcName = "prints";
-		}
-		if (argType & ts.TypeFlags.Number) {
-			funcName = "printd";
-		}
 	}
 	else {
 		let imported: boolean = false;
@@ -531,10 +479,6 @@ function processCallExpression(callExpression: ts.CallExpression): number {
 			let paramTypes: ts.Type[] = paramRegs.map(reg => reg.type as ts.Type);
 			cgm.iBuff.emitFunctionDeclaration(new inst.FunctionDeclarationInstruction(funcName, retType, paramTypes))
 		}
-	}
-
-	if (libFunctions.indexOf(funcName) > -1) {
-		return emitLibFuncitonCall(callExpression).reg;
 	}
 
 	return emitFunctionCall(retType, funcName, paramRegs).reg;

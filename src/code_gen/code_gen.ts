@@ -73,9 +73,8 @@ export function processProgram(): void {
 	writeFileSync(cgm.wrapperOutputPath, cgm.printer.printFile(wrapperSourceFile));
 }
 function processNode(node: ts.Node): CodeGenContext {
+
 	switch (node.kind) {
-		case ts.SyntaxKind.ImportDeclaration:
-			return new StatementCodeGenContext([]);
 
 		case ts.SyntaxKind.Identifier:
 			const id = node as ts.Identifier;
@@ -90,10 +89,6 @@ function processNode(node: ts.Node): CodeGenContext {
 
 		case ts.SyntaxKind.ParenthesizedExpression:
 			return processNode((node as ts.ParenthesizedExpression).expression);
-
-		case ts.SyntaxKind.ExpressionStatement:
-			processNode((node as ts.ExpressionStatement).expression); //TODO: make sure there is nothing to do with the return value
-			return new StatementCodeGenContext([]);
 
 		case ts.SyntaxKind.BinaryExpression:
 			const typeFlags = cgm.checker.getTypeAtLocation(node).flags;
@@ -172,65 +167,6 @@ function processNode(node: ts.Node): CodeGenContext {
 
 			return emitFunctionCall(retType, funcName, paramRegs);
 
-		case ts.SyntaxKind.VariableStatement:
-			(node as ts.VariableStatement).declarationList.declarations.forEach(processNode);
-			return new StatementCodeGenContext([]);
-
-		case ts.SyntaxKind.VariableDeclaration:
-			let varDec = node as ts.VariableDeclaration;
-			if (varDec.initializer) {
-				let expCtx = processNode(varDec.initializer) as ExpressionCodeGenContext;
-				if (expCtx.isValueSaved) {
-					cgm.regMap.set(varDec.name.getText(), (expCtx as SavedExpressionCodeGenContext).reg);
-				}
-				else {
-					//TODO: save bool value if necessary
-				}
-			}
-			return new StatementCodeGenContext([]);
-
-		case ts.SyntaxKind.ReturnStatement:
-			const retStat = node as ts.ReturnStatement;
-			let retInst: inst.ReturnInstruction;
-			if (retStat.expression) {
-				const expCtx = processNode(retStat.expression) as ExpressionCodeGenContext;
-				let retReg: number;
-				if (!expCtx.isValueSaved) {
-					retReg = 0;//TODO: save exp value
-				}
-				else {
-					retReg = (expCtx as SavedExpressionCodeGenContext).reg;
-				}
-				let retType = cgm.checker.getTypeAtLocation(retStat.expression);
-				retInst = new inst.ReturnInstruction(retType, retReg);
-			}
-			else {
-				retInst = new inst.ReturnInstruction(null);
-			}
-			cgm.iBuff.emit(retInst);
-			return new StatementCodeGenContext([]);
-
-		case ts.SyntaxKind.Block:
-			return emitBlock(node as ts.Block);
-
-		case ts.SyntaxKind.IfStatement:
-			const ifStat = node as ts.IfStatement;
-			const expCgCtx = processNode(ifStat.expression) as UnsavedExpressionCodeGenContext; //TODO: handle cases where the expression is an identifier/constant value (saved value in general)
-			const trueLabel = cgm.iBuff.emitNewLabel();
-
-			cgm.iBuff.backPatch((expCgCtx as UnsavedExpressionCodeGenContext).trueList, trueLabel);
-			const thenBpCtx = processNode(ifStat.thenStatement) as StatementCodeGenContext;
-
-			if (ifStat.elseStatement){
-				const falseLabel = cgm.iBuff.emitNewLabel();
-				cgm.iBuff.backPatch(expCgCtx.falseList, falseLabel);
-				const elseBpCtx = processNode(ifStat.elseStatement) as StatementCodeGenContext;
-				return new StatementCodeGenContext(elseBpCtx.nextList.concat(thenBpCtx.nextList));
-			}
-			else { //no else statement
-				return new StatementCodeGenContext(expCgCtx.falseList.concat(thenBpCtx.nextList));
-			}
-
 		case ts.SyntaxKind.NewExpression:
 			return emitNewExpression(node as ts.NewExpression);
 
@@ -247,7 +183,8 @@ function getSymbolTypeFlags(symbol: ts.Symbol): ts.Type {
 	return cgm.checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration!);
 }
 
-function emitFunctionDeclaration(fun: ts.FunctionLikeDeclaration, cls?: ts.Type): void {
+//TODO: discard this function or split it to smaller tasks
+function emitFunctionDefinition(fun: ts.FunctionLikeDeclaration, cls?: ts.Type): void {
 	const signature = cgm.checker.getSignatureFromDeclaration(fun)!;
 	let paramTypes: ts.Type[] = [];
 	cgm.regMap.clear();
@@ -358,45 +295,6 @@ function emitSaveNumericValue(val: number): SavedExpressionCodeGenContext {
 	return new SavedExpressionCodeGenContext(reg);
 }
 
-function emitClassMethod(method: ts.FunctionLikeDeclaration, classType: ts.Type): void {
-	/*
-		assumptions:
-		* input declaration must be either a ctor or a class method
-		*/
-	emitFunctionDeclaration(method, classType);
-	let ctorRetReg: number = 0;
-	if (method.kind == ts.SyntaxKind.Constructor) {
-		ctorRetReg = cgm.iBuff.getNewReg();
-		cgm.iBuff.emit(new inst.ObjectAllocationInstruction(ctorRetReg, classType));
-		cgm.regMap.set('this', ctorRetReg);
-	}
-	let bpCtx = emitBlock(method.body as ts.FunctionBody);
-	if (!bpCtx.isEmpty()) {
-		let label: number = cgm.iBuff.emitNewLabel();
-		cgm.iBuff.backPatch(bpCtx.nextList, label);
-	}
-	let retType: ts.Type = cgm.checker.getSignatureFromDeclaration(method)!.getReturnType();
-	if (method.kind == ts.SyntaxKind.Constructor) {
-		cgm.iBuff.emit(new inst.ReturnInstruction(classType, ctorRetReg));
-	}
-	else if (retType.getFlags() & ts.TypeFlags.Void) {
-		cgm.iBuff.emit(new inst.ReturnInstruction(null));
-	}
-	cgm.iBuff.emit(new inst.FunctionEndInstruction());
-}
-
-function emitBlock(block: ts.BlockLike): StatementCodeGenContext {
-	let bpCtx = new StatementCodeGenContext([]);
-	block.statements.forEach(statement => {
-		if (!bpCtx.isEmpty()){
-			const label = cgm.iBuff.emitNewLabel();
-			cgm.iBuff.backPatch(bpCtx.nextList, label)
-		}
-		bpCtx = processNode(statement) as StatementCodeGenContext;
-	});
-	return bpCtx;
-}
-
 function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
 	let objType: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(cgm.checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
 	let paramRegs: inst.TypedReg[] = [];
@@ -465,7 +363,7 @@ function processSourceFile(file: ts.SourceFile): ts.SourceFile {
 				break;
 			case ts.SyntaxKind.FunctionDeclaration:
 				//TODO: create wrapper function if declaration is exported
-				processFunctionDecleration(st as ts.FunctionDeclaration);
+				processFunctionDeclaration(st as ts.FunctionDeclaration);
 				break;
 			default:
 				//TODO: add copying top level statements to wrapper
@@ -491,7 +389,6 @@ function processClassDecleration(classDeclaration: ts.ClassDeclaration): ts.Stat
 	for (let i: number = 0; i < properties.length; i++) {
 		emitObjectFieldGetter(type, properties[i], propTypes[i], i);
 		emitObjectFieldSetter(type, properties[i], propTypes[i], i);
-
 	}
 	cgm.iBuff.emitStructDefinition(new inst.StructDefinitionInstruction(symbol.name, propTypeFlags));
 	emitObjectAllocationFunctionDefinition(type);
@@ -503,12 +400,12 @@ function processClassDecleration(classDeclaration: ts.ClassDeclaration): ts.Stat
 				wrapperClassMembers.push(wg.createWrapperSetter(child as ts.PropertyDeclaration));
 				break;
 			case ts.SyntaxKind.Constructor:
-				emitClassMethod(child as ts.FunctionLikeDeclaration, type);
-				wrapperClassMembers.push(wg.createWrapperConstructorDeclaration(child as ts.ConstructorDeclaration));
+				let wrapperConstructorDeclaration = processConstructorDeclaration(child as ts.ConstructorDeclaration, type);
+				wrapperClassMembers.push(wrapperConstructorDeclaration);
 				break;
 			case ts.SyntaxKind.MethodDeclaration:
-				emitClassMethod(child as ts.FunctionLikeDeclaration, type);
-				wrapperClassMembers.push(wg.createWrapperMethodDeclaration(child as ts.MethodDeclaration))
+				let wrapperMethodDeclaration = processMethodDeclaration(child as ts.MethodDeclaration, type);
+				wrapperClassMembers.push(wrapperMethodDeclaration);
 				break;
 		}
 	});
@@ -516,14 +413,133 @@ function processClassDecleration(classDeclaration: ts.ClassDeclaration): ts.Stat
 	return wg.createWrapperClassDecleration(classDeclaration.name!.getText(), wrapperClassMembers);
 }
 
-function processFunctionDecleration(functionDecleration: ts.FunctionDeclaration): void {
-	emitFunctionDeclaration(functionDecleration);
-	//TODO: replace processNode with compileBlock and handle return value
-	processNode(functionDecleration.body!);
+//TODO: replace classType with general inherited context
+function processConstructorDeclaration(constructorDecleration: ts.ConstructorDeclaration, classType: ts.Type): ts.ConstructorDeclaration {
+	/**
+	 * assumptions:
+	 * - constructor has a single declaration
+	 */
+	emitFunctionDefinition(constructorDecleration, classType);
+	let ctorRetReg: number = 0;
+	ctorRetReg = cgm.iBuff.getNewReg();
+	cgm.iBuff.emit(new inst.ObjectAllocationInstruction(ctorRetReg, classType));
+	cgm.regMap.set('this', ctorRetReg);
+	constructorDecleration.body!.statements.forEach(processStatement);
+	cgm.iBuff.emit(new inst.ReturnInstruction(classType, ctorRetReg));
+	cgm.iBuff.emit(new inst.FunctionEndInstruction());
+
+	return wg.createWrapperConstructorDeclaration(constructorDecleration);
+}
+
+//TODO: replace classType with general inherited context
+function processMethodDeclaration(methodDeclaration: ts.MethodDeclaration, classType: ts.Type): ts.MethodDeclaration {
+	emitFunctionDefinition(methodDeclaration, classType);
+	methodDeclaration.body!.statements.forEach(processStatement);
+	let retType: ts.Type = cgm.checker.getSignatureFromDeclaration(methodDeclaration)!.getReturnType();
+	if (retType.getFlags() & ts.TypeFlags.Void) {
+		cgm.iBuff.emit(new inst.ReturnInstruction(null));
+	}
+	cgm.iBuff.emit(new inst.FunctionEndInstruction());
+
+	return wg.createWrapperMethodDeclaration(methodDeclaration);
+
+}
+
+function processFunctionDeclaration(functionDecleration: ts.FunctionDeclaration): void {
+	const signature = cgm.checker.getSignatureFromDeclaration(functionDecleration)!;
+	let paramTypes: ts.Type[] = [];
+	cgm.regMap.clear();
+	for (let i = 0; i < signature.parameters.length; i++) {
+		const paramSymbol = signature.parameters[i];
+		cgm.regMap.set(paramSymbol.getName(), -(i + 1)); //TODO: find an elegant representations of function arguments
+		paramTypes.push(getSymbolTypeFlags(paramSymbol));
+	}
+
+	let retType = cgm.checker.getReturnTypeOfSignature(signature);
+	let id = functionDecleration.name!.getText();
+
+	cgm.iBuff.emit(new inst.FunctionDefinitionInstruction(id, retType, paramTypes));
+
+	functionDecleration.body!.statements.forEach(processStatement);
+
 	//TODO: make this if more readable
 	if ( cgm.checker.getReturnTypeOfSignature(cgm.checker.getSignatureFromDeclaration(functionDecleration)!).flags & ts.TypeFlags.Void) {
 		cgm.iBuff.emit(new inst.ReturnInstruction(null));
 	}
 
 	cgm.iBuff.emit(new inst.FunctionEndInstruction());
+}
+
+function processStatement(st: ts.Statement): void {
+	switch (st.kind) {
+		case ts.SyntaxKind.ExpressionStatement:
+			processExpression((st as ts.ExpressionStatement).expression);
+			break;
+		case ts.SyntaxKind.VariableStatement:
+			processVariableDeclerationsList((st as ts.VariableStatement).declarationList);
+			break;
+		case ts.SyntaxKind.ReturnStatement:
+			processReturnStatement(st as ts.ReturnStatement);
+			break;
+		case ts.SyntaxKind.Block:
+			(st as ts.Block).statements.forEach(processStatement);
+			break;
+		case ts.SyntaxKind.IfStatement:
+			processIfStatement(st as ts.IfStatement);
+			break;
+		default:
+			throw new Error(`unsupported statement kind: ${ts.SyntaxKind[st.kind]}`);
+			break;
+	}
+}
+
+function processVariableDeclerationsList(list: ts.VariableDeclarationList): void {
+	//(node as ts.VariableStatement).declarationList.declarations.forEach(processNode);
+	list.declarations.forEach(variableDecleration => {
+		if (variableDecleration.initializer) {
+			//TODO: handle boolean values
+			let resultReg: number = processExpression(variableDecleration.initializer);
+			let variableName: string = variableDecleration.name.getText();
+			cgm.regMap.set(variableName, resultReg);
+		}
+	});
+}
+
+function processReturnStatement(returnStatement: ts.ReturnStatement): void {
+	let retInst: inst.ReturnInstruction;
+	if (returnStatement.expression) {
+		//TODO: handle boolean values
+		let resultReg: number = processExpression(returnStatement.expression);
+		let retType = cgm.checker.getTypeAtLocation(returnStatement.expression);
+		retInst = new inst.ReturnInstruction(retType, resultReg);
+	}
+	else {
+		retInst = new inst.ReturnInstruction(null);
+	}
+	cgm.iBuff.emit(retInst);
+}
+
+function processIfStatement(st: ts.IfStatement): void {
+	throw new Error('if statements are currently broken');
+	//TODO: this is an old implementation, should be reviewed
+	// const ifStat = node as ts.IfStatement;
+	// const expCgCtx = processNode(ifStat.expression) as UnsavedExpressionCodeGenContext; //TODO: handle cases where the expression is an identifier/constant value (saved value in general)
+	// const trueLabel = cgm.iBuff.emitNewLabel();
+
+	// cgm.iBuff.backPatch((expCgCtx as UnsavedExpressionCodeGenContext).trueList, trueLabel);
+	// const thenBpCtx = processNode(ifStat.thenStatement) as StatementCodeGenContext;
+
+	// if (ifStat.elseStatement){
+	// 	const falseLabel = cgm.iBuff.emitNewLabel();
+	// 	cgm.iBuff.backPatch(expCgCtx.falseList, falseLabel);
+	// 	const elseBpCtx = processNode(ifStat.elseStatement) as StatementCodeGenContext;
+	// 	return new StatementCodeGenContext(elseBpCtx.nextList.concat(thenBpCtx.nextList));
+	// }
+	// else { //no else statement
+	// 	return new StatementCodeGenContext(expCgCtx.falseList.concat(thenBpCtx.nextList));
+	// }
+}
+
+function processExpression(exp: ts.Expression): number {
+	return (processNode(exp) as SavedExpressionCodeGenContext).reg;
 }

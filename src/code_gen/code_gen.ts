@@ -72,112 +72,6 @@ export function processProgram(): void {
 
 	writeFileSync(cgm.wrapperOutputPath, cgm.printer.printFile(wrapperSourceFile));
 }
-function processNode(node: ts.Node): CodeGenContext {
-
-	switch (node.kind) {
-
-		case ts.SyntaxKind.Identifier:
-			const id = node as ts.Identifier;
-			const reg = cgm.regMap.get(id.text);
-			return new SavedExpressionCodeGenContext(reg!);
-
-		case ts.SyntaxKind.NumericLiteral:
-			// ? TODO: return the constant value as context instead of saving it to register
-			const val = parseInt(node.getText()); //TODO: support bases other than decimal
-			return emitSaveNumericValue(val);
-
-
-		case ts.SyntaxKind.ParenthesizedExpression:
-			return processNode((node as ts.ParenthesizedExpression).expression);
-
-		case ts.SyntaxKind.BinaryExpression:
-			const typeFlags = cgm.checker.getTypeAtLocation(node).flags;
-			if ((node as ts.BinaryExpression).operatorToken.kind == ts.SyntaxKind.EqualsToken) {
-				return emitAssignment(node as ts.BinaryExpression);
-			}
-			if (typeFlags & ts.TypeFlags.Number) {
-				return emitNumericBinaryExpression(node as ts.BinaryExpression);
-			}
-			if (typeFlags & ts.TypeFlags.Boolean) {
-				return emitBooleanBinaryExpression(node as ts.BinaryExpression)
-			}
-			else {
-				console.log("unsupported expression type flags: " + typeFlags);
-			}
-			node.forEachChild(processNode);
-			return new StatementCodeGenContext([]);
-
-		case ts.SyntaxKind.CallExpression:
-			let callExp = node as ts.CallExpression;
-			let funcName = "";
-
-			let paramRegs: inst.TypedReg[] = [];
-			callExp.arguments.forEach(exp => {
-				const expCtx = processNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
-				let argType = cgm.checker.getTypeAtLocation(exp);
-				if (argType.getFlags() == ts.TypeFlags.Any) {
-					argType = cgm.checker.getContextualType(exp)!;
-				}
-				paramRegs.push({
-					reg: expCtx.reg, type: argType
-				});
-			});
-
-			let retType: ts.Type | null = cgm.checker.getTypeAtLocation(callExp);
-			//TODO: remove handling console.log and replace with printf
-			if (callExp.expression.kind == ts.SyntaxKind.Identifier) {
-				funcName = (callExp.expression as ts.Identifier).text;
-			}
-			else if (callExp.expression.kind == ts.SyntaxKind.PropertyAccessExpression &&
-					callExp.expression.getText() == "console.log") {
-
-				retType = null;
-				//TODO: handle multiple arguments and other argument types
-				let argType = cgm.checker.getTypeAtLocation(callExp.arguments[0]).flags;
-				if (argType & ts.TypeFlags.String) {
-					funcName = "prints";
-				}
-				if (argType & ts.TypeFlags.Number) {
-					funcName = "printd";
-				}
-			}
-			else {
-				let imported: boolean = false;
-				if ((callExp.expression as ts.PropertyAccessExpression).expression.kind == ts.SyntaxKind.ThisKeyword) {
-					let objType: ts.Type = cgm.checker.getTypeAtLocation((callExp.expression as ts.PropertyAccessExpression).expression);
-					funcName =  objType.getSymbol()!.getName();
-					paramRegs.push({ reg: cgm.regMap.get('this')!, type: objType})
-				}
-				else {
-					funcName =  ((callExp.expression as ts.PropertyAccessExpression).expression as ts.Identifier).getText();
-					imported = true;
-				}
-				funcName += '_' + (callExp.expression as ts.PropertyAccessExpression).name.getText();
-				if (imported && (importedFunctions.indexOf(funcName) == -1) ) {
-					importedFunctions.push(funcName);
-					importedFunctionsNodes.push(callExp.expression as ts.PropertyAccessExpression);
-					let paramTypes: ts.Type[] = paramRegs.map(reg => reg.type as ts.Type);
-					cgm.iBuff.emitFunctionDeclaration(new inst.FunctionDeclarationInstruction(funcName, retType, paramTypes))
-				}
-			}
-
-			if (libFunctions.indexOf(funcName) > -1) {
-				return emitLibFuncitonCall(callExp);
-			}
-
-			return emitFunctionCall(retType, funcName, paramRegs);
-
-		case ts.SyntaxKind.NewExpression:
-			return emitNewExpression(node as ts.NewExpression);
-
-		case ts.SyntaxKind.PropertyAccessExpression:
-			return emitLoadProperty(node as ts.PropertyAccessExpression);
-
-		default:
-			throw new Error("unsupported node kind: " + ts.SyntaxKind[node.kind]);
-			break;
-	}
-}
 
 function getSymbolTypeFlags(symbol: ts.Symbol): ts.Type {
 	return cgm.checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration!);
@@ -215,35 +109,36 @@ function emitFunctionDefinition(fun: ts.FunctionLikeDeclaration, cls?: ts.Type):
 }
 
 function emitNumericBinaryExpression(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {
-	const leftCtx = processNode(exp.left) as SavedExpressionCodeGenContext;
-	const rightCtx = processNode(exp.right) as SavedExpressionCodeGenContext;
+	const leftReg = processExpression(exp.left);
+	const rightReg = processExpression(exp.right);
 	const resReg = cgm.iBuff.getNewReg();
-	cgm.iBuff.emit(new inst.NumericOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+	cgm.iBuff.emit(new inst.NumericOpInstruction(resReg, leftReg, rightReg, exp.operatorToken.kind));
 	return new SavedExpressionCodeGenContext(resReg);
 }
 
-function emitBooleanBinaryExpression(exp: ts.BinaryExpression): UnsavedExpressionCodeGenContext {
-	const leftCtx = processNode(exp.left) as SavedExpressionCodeGenContext;
-	const rightCtx = processNode(exp.right) as SavedExpressionCodeGenContext;
-	switch (exp.operatorToken.kind) {
-		case ts.SyntaxKind.LessThanToken:
-		case ts.SyntaxKind.LessThanEqualsToken:
-		case ts.SyntaxKind.GreaterThanToken:
-		case ts.SyntaxKind.GreaterThanEqualsToken:
-		case ts.SyntaxKind.EqualsEqualsToken:
-		case ts.SyntaxKind.ExclamationEqualsToken:
-			let resReg = cgm.iBuff.getNewReg();
-			cgm.iBuff.emit(new inst.EqualityOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
-			let brInst = cgm.iBuff.emit(new inst.ConditionalBranchInstruction(resReg));
-			let trueEntry: inst.BpEntry = { instruction: brInst, index: 0 };
-			let falseEntry: inst.BpEntry = { instruction: brInst, index: 1 };
-			return new UnsavedExpressionCodeGenContext([trueEntry], [falseEntry]);
-			break;
-		default:
-			throw new Error("unsupported binary op: " + ts.SyntaxKind[exp.operatorToken.kind]);
-	}
+//TODO: re-implement this function when taking care of boolean expressions
+// function emitBooleanBinaryExpression(exp: ts.BinaryExpression): UnsavedExpressionCodeGenContext {
+// 	const leftCtx = processNode(exp.left) as SavedExpressionCodeGenContext;
+// 	const rightCtx = processNode(exp.right) as SavedExpressionCodeGenContext;
+// 	switch (exp.operatorToken.kind) {
+// 		case ts.SyntaxKind.LessThanToken:
+// 		case ts.SyntaxKind.LessThanEqualsToken:
+// 		case ts.SyntaxKind.GreaterThanToken:
+// 		case ts.SyntaxKind.GreaterThanEqualsToken:
+// 		case ts.SyntaxKind.EqualsEqualsToken:
+// 		case ts.SyntaxKind.ExclamationEqualsToken:
+// 			let resReg = cgm.iBuff.getNewReg();
+// 			cgm.iBuff.emit(new inst.EqualityOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
+// 			let brInst = cgm.iBuff.emit(new inst.ConditionalBranchInstruction(resReg));
+// 			let trueEntry: inst.BpEntry = { instruction: brInst, index: 0 };
+// 			let falseEntry: inst.BpEntry = { instruction: brInst, index: 1 };
+// 			return new UnsavedExpressionCodeGenContext([trueEntry], [falseEntry]);
+// 			break;
+// 		default:
+// 			throw new Error("unsupported binary op: " + ts.SyntaxKind[exp.operatorToken.kind]);
+// 	}
 
-}
+// }
 
 function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: inst.TypedReg[]): SavedExpressionCodeGenContext {
 	//TODO: remove allocating new reg for void functions
@@ -289,42 +184,36 @@ function emitLibFuncitonCall(funCall: ts.CallExpression): SavedExpressionCodeGen
 	return new SavedExpressionCodeGenContext(llvmRetReg.reg);
 }
 
-function emitSaveNumericValue(val: number): SavedExpressionCodeGenContext {
-	const reg = cgm.iBuff.getNewReg();
-	cgm.iBuff.emit(new inst.NumericAssignmentInstruction(reg, val));
-	return new SavedExpressionCodeGenContext(reg);
-}
-
 function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
 	let objType: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(cgm.checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
 	let paramRegs: inst.TypedReg[] = [];
 	//TODO: wrap this part with 'emitArguments' or something similar and merge with compileNode CallExpression case
 	newExp.arguments?.forEach(exp => {
-		const expCtx = processNode(exp) as SavedExpressionCodeGenContext; //TODO: handle unsaved expressions
+		const expReg = processExpression(exp); //TODO: handle unsaved expressions
 		let argType = cgm.checker.getTypeAtLocation(exp);
 		if (argType.getFlags() == ts.TypeFlags.Any) {
 			argType = cgm.checker.getContextualType(exp)!;
 		}
 		paramRegs.push({
-			reg: expCtx.reg, type: argType
+			reg: expReg, type: argType
 		});
 	});
 	let funcName: string = objType.getSymbol()!.getName() + '_constructor'
 	return emitFunctionCall(objType, funcName, paramRegs);
 }
 
-function emitAssignment(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {
-	let rightCgCtx = processNode(exp.right) as SavedExpressionCodeGenContext;
+function emitAssignment(exp: ts.BinaryExpression): number {
+	let rightReg = processExpression(exp.right);
 	if (exp.left.kind == ts.SyntaxKind.Identifier) {
-		cgm.regMap.set((exp.left as ts.Identifier).getText(), rightCgCtx.reg);
+		cgm.regMap.set((exp.left as ts.Identifier).getText(), rightReg);
 	}
 	else {
 		assert(exp.left.kind == ts.SyntaxKind.PropertyAccessExpression);
 		//TODO: add assertion of the property access being a property and not function
 		let leftCgCtx: SavedExpressionCodeGenContext = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
-		cgm.iBuff.emit(new inst.StoreInstruction(leftCgCtx.reg, rightCgCtx.reg, cgm.checker.getTypeAtLocation(exp.right)));
+		cgm.iBuff.emit(new inst.StoreInstruction(leftCgCtx.reg, rightReg, cgm.checker.getTypeAtLocation(exp.right)));
 	}
-	return rightCgCtx;
+	return rightReg;
 }
 
 function emitGetPropertyAddress(exp: ts.PropertyAccessExpression): SavedExpressionCodeGenContext {
@@ -541,5 +430,112 @@ function processIfStatement(st: ts.IfStatement): void {
 }
 
 function processExpression(exp: ts.Expression): number {
-	return (processNode(exp) as SavedExpressionCodeGenContext).reg;
+	switch (exp.kind) {
+		case ts.SyntaxKind.Identifier:
+			return cgm.regMap.get((exp as ts.Identifier).getText())!;
+			break;
+		case ts.SyntaxKind.NumericLiteral:
+			return processNumericLiteral(exp as ts.NumericLiteral);
+			break;
+		case ts.SyntaxKind.ParenthesizedExpression:
+			return processExpression((exp as ts.ParenthesizedExpression).expression);
+			break;
+		case ts.SyntaxKind.BinaryExpression:
+			return processBinaryExpression(exp as ts.BinaryExpression);
+			break;
+		case ts.SyntaxKind.NewExpression:
+			return emitNewExpression(exp as ts.NewExpression).reg;
+			break;
+		case ts.SyntaxKind.PropertyAccessExpression:
+			return emitLoadProperty(exp as ts.PropertyAccessExpression).reg;
+			break;
+		case ts.SyntaxKind.CallExpression:
+			return processCallExpression(exp as ts.CallExpression);
+			break;
+		default:
+			throw new Error(`unsupported expression kind: ${ts.SyntaxKind[exp.kind]}`);
+			break;
+	}
+}
+
+function processNumericLiteral(numericLiteral: ts.NumericLiteral): number {
+	// ? TODO: return the constant value as context instead of saving it to register
+	const val = parseInt((numericLiteral as ts.NumericLiteral).getText()); //TODO: support bases other than decimal
+	const reg = cgm.iBuff.getNewReg();
+	cgm.iBuff.emit(new inst.NumericAssignmentInstruction(reg, val));
+	return reg;
+}
+
+function processBinaryExpression(binaryExpression: ts.BinaryExpression): number {
+	const typeFlags = cgm.checker.getTypeAtLocation(binaryExpression).flags;
+	if ((binaryExpression as ts.BinaryExpression).operatorToken.kind == ts.SyntaxKind.EqualsToken) {
+		return emitAssignment(binaryExpression as ts.BinaryExpression);
+	}
+	else if (typeFlags & ts.TypeFlags.Number) {
+		return emitNumericBinaryExpression(binaryExpression as ts.BinaryExpression).reg;
+	}
+	else {
+		throw new Error('unsupported expression type');
+	}
+}
+
+//TODO: refactor this function ASAP
+function processCallExpression(callExpression: ts.CallExpression): number {
+	let funcName = "";
+
+	let paramRegs: inst.TypedReg[] = [];
+	callExpression.arguments.forEach(exp => {
+		const expReg = processExpression(exp); //TODO: handle unsaved expressions
+		let argType = cgm.checker.getTypeAtLocation(exp);
+		if (argType.getFlags() == ts.TypeFlags.Any) {
+			argType = cgm.checker.getContextualType(exp)!;
+		}
+		paramRegs.push({
+			reg: expReg, type: argType
+		});
+	});
+
+	let retType: ts.Type | null = cgm.checker.getTypeAtLocation(callExpression);
+	//TODO: remove handling console.log and replace with printf
+	if (callExpression.expression.kind == ts.SyntaxKind.Identifier) {
+		funcName = (callExpression.expression as ts.Identifier).text;
+	}
+	else if (callExpression.expression.kind == ts.SyntaxKind.PropertyAccessExpression &&
+		 callExpression.expression.getText() == "console.log") {
+
+		retType = null;
+		//TODO: handle multiple arguments and other argument types
+		let argType = cgm.checker.getTypeAtLocation(callExpression.arguments[0]).flags;
+		if (argType & ts.TypeFlags.String) {
+			funcName = "prints";
+		}
+		if (argType & ts.TypeFlags.Number) {
+			funcName = "printd";
+		}
+	}
+	else {
+		let imported: boolean = false;
+		if ((callExpression.expression as ts.PropertyAccessExpression).expression.kind == ts.SyntaxKind.ThisKeyword) {
+			let objType: ts.Type = cgm.checker.getTypeAtLocation((callExpression.expression as ts.PropertyAccessExpression).expression);
+			funcName =  objType.getSymbol()!.getName();
+			paramRegs.push({ reg: cgm.regMap.get('this')!, type: objType})
+		}
+		else {
+			funcName =  ((callExpression.expression as ts.PropertyAccessExpression).expression as ts.Identifier).getText();
+			imported = true;
+		}
+		funcName += '_' + (callExpression.expression as ts.PropertyAccessExpression).name.getText();
+		if (imported && (importedFunctions.indexOf(funcName) == -1) ) {
+			importedFunctions.push(funcName);
+			importedFunctionsNodes.push(callExpression.expression as ts.PropertyAccessExpression);
+			let paramTypes: ts.Type[] = paramRegs.map(reg => reg.type as ts.Type);
+			cgm.iBuff.emitFunctionDeclaration(new inst.FunctionDeclarationInstruction(funcName, retType, paramTypes))
+		}
+	}
+
+	if (libFunctions.indexOf(funcName) > -1) {
+		return emitLibFuncitonCall(callExpression).reg;
+	}
+
+	return emitFunctionCall(retType, funcName, paramRegs).reg;
 }

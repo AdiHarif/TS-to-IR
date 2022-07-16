@@ -1,5 +1,6 @@
 
 import * as ts from "typescript";
+import { getSystemErrorMap } from "util";
 
 import * as cgm from "../manager.js"
 
@@ -51,4 +52,27 @@ export function expressionIrName(exp: ts.PropertyAccessExpression): string {
 
 export function methodDeclarationToIrName(decl: ts.MethodDeclaration): string {
 	return `${(decl.parent as ts.ClassDeclaration).name!.getText()}_${decl.name!.getText()}`
+}
+
+//TODO: replace with processLeftHandSideExpression
+export function leftHandSideExpressionToLlvmName(leftHandSideExpression: ts.LeftHandSideExpression): string {
+	switch (leftHandSideExpression.kind) {
+		case ts.SyntaxKind.Identifier:
+			//TODO: handle identifiers that represent a variable holding a function
+			return (leftHandSideExpression as ts.Identifier).getText();
+			break;
+		case ts.SyntaxKind.PropertyAccessExpression:
+			let propertyAccessExpression = (leftHandSideExpression as ts.PropertyAccessExpression);
+			let accessExpresstionLeftName = leftHandSideExpressionToLlvmName(propertyAccessExpression.expression);
+			let accessExpresstionMemberName = propertyAccessExpression.name.getText();
+			return `${accessExpresstionLeftName}_${accessExpresstionMemberName}`;
+			break;
+		case ts.SyntaxKind.ThisKeyword:
+			let type = cgm.checker.getTypeAtLocation(leftHandSideExpression);
+			return type.symbol.getName();
+			break;
+		default:
+			throw new Error(`unsupported LeftHandSideExpression kind: ${ts.SyntaxKind[leftHandSideExpression.kind]}`);
+			break;
+	}
 }

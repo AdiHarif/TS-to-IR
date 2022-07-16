@@ -8,6 +8,7 @@ import * as inst from "./llvm/instructions";
 import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./llvm/llvm_templates.js"
 import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts/ts_templates";
 import * as wg from "./ts/wrapper_gen"
+import * as llvm_utils from "./llvm/utils";
 
 class StatementCodeGenContext {
 	public nextList: inst.BpEntry[] = [];
@@ -443,7 +444,6 @@ function processBinaryExpression(binaryExpression: ts.BinaryExpression): number 
 
 //TODO: refactor this function ASAP
 function processCallExpression(callExpression: ts.CallExpression): number {
-	let funcName = "";
 
 	let paramRegs: inst.TypedReg[] = [];
 	callExpression.arguments.forEach(exp => {
@@ -458,28 +458,34 @@ function processCallExpression(callExpression: ts.CallExpression): number {
 	});
 
 	let retType: ts.Type | null = cgm.checker.getTypeAtLocation(callExpression);
-	if (callExpression.expression.kind == ts.SyntaxKind.Identifier) {
-		funcName = (callExpression.expression as ts.Identifier).text;
+	let funcName = llvm_utils.leftHandSideExpressionToLlvmName(callExpression.expression);
+	let imported: boolean = isCallExpressionImported(callExpression);
+
+	if (isMethodCall(callExpression)) {
+		let objType: ts.Type = cgm.checker.getTypeAtLocation((callExpression.expression as ts.PropertyAccessExpression).expression);
+		paramRegs.push({ reg: cgm.regMap.get('this')!, type: objType})
 	}
-	else {
-		let imported: boolean = false;
-		if ((callExpression.expression as ts.PropertyAccessExpression).expression.kind == ts.SyntaxKind.ThisKeyword) {
-			let objType: ts.Type = cgm.checker.getTypeAtLocation((callExpression.expression as ts.PropertyAccessExpression).expression);
-			funcName =  objType.getSymbol()!.getName();
-			paramRegs.push({ reg: cgm.regMap.get('this')!, type: objType})
-		}
-		else {
-			funcName =  ((callExpression.expression as ts.PropertyAccessExpression).expression as ts.Identifier).getText();
-			imported = true;
-		}
-		funcName += '_' + (callExpression.expression as ts.PropertyAccessExpression).name.getText();
-		if (imported && (importedFunctions.indexOf(funcName) == -1) ) {
-			importedFunctions.push(funcName);
-			importedFunctionsNodes.push(callExpression.expression as ts.PropertyAccessExpression);
-			let paramTypes: ts.Type[] = paramRegs.map(reg => reg.type as ts.Type);
-			cgm.iBuff.emitFunctionDeclaration(new inst.FunctionDeclarationInstruction(funcName, retType, paramTypes))
-		}
+
+	if (imported && (importedFunctions.indexOf(funcName) == -1) ) {
+		importedFunctions.push(funcName);
+		importedFunctionsNodes.push(callExpression.expression as ts.PropertyAccessExpression);
+		let paramTypes: ts.Type[] = paramRegs.map(reg => reg.type as ts.Type);
+		cgm.iBuff.emitFunctionDeclaration(new inst.FunctionDeclarationInstruction(funcName, retType, paramTypes))
 	}
 
 	return emitFunctionCall(retType, funcName, paramRegs).reg;
+}
+
+function isCallExpressionImported(callExpression: ts.CallExpression): boolean {
+	return (
+		(callExpression.expression.kind == ts.SyntaxKind.PropertyAccessExpression) &&
+		((callExpression.expression as ts.PropertyAccessExpression).expression.kind != ts.SyntaxKind.ThisKeyword)
+	);
+}
+
+function isMethodCall(callExpression: ts.CallExpression): boolean {
+	return (
+		(callExpression.expression.kind == ts.SyntaxKind.PropertyAccessExpression) &&
+		((callExpression.expression as ts.PropertyAccessExpression).expression.kind == ts.SyntaxKind.ThisKeyword)
+	);
 }

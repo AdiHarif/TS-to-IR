@@ -1,6 +1,8 @@
 
 import * as ts from "typescript";
 
+import * as cgm from "../manager.js"
+
 export function typeToLlvmType(type: ts.Type | null, forceObjPtr: boolean = false): string {
 	if (type == null) {
 		return typeFlagsToLlvmType(ts.TypeFlags.Void);

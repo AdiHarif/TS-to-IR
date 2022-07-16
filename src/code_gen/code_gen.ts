@@ -5,8 +5,8 @@ import { assert } from "console";
 
 import * as cgm from "./manager.js"
 import * as inst from "./llvm/instructions";
-import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./llvm/templates.js"
-import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts/templates.js";
+import { emitObjectAllocationFunctionDefinition, emitObjectFieldGetter, emitObjectFieldSetter } from "./llvm/llvm_templates.js"
+import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts/ts_templates";
 import { createWrapperClassDecleration, createWrapperConstructorDeclaration, createWrapperGetter, createWrapperSetter, createWrapperMethodDeclaration } from "./ts/wrapper_gen.js";
 
 class StatementCodeGenContext {

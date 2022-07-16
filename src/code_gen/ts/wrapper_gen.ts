@@ -43,7 +43,10 @@ export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.M
 		let retTypeName: string = cgm.checker.typeToString(retType);
 		if (retTypeName == className) {
 			bodyCallExpression = ts.factory.createCallExpression(
-				ts.factory.createIdentifier('wrapTwinObject'),
+				ts.factory.createPropertyAccessExpression(
+					ts.factory.createIdentifier(className),
+					'wrapTwinObject'
+				),
 				undefined,
 				[ bodyCallExpression ]
 			)

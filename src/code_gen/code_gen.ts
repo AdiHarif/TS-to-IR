@@ -424,7 +424,7 @@ export function compileProgram(): void {
 					break;
 			}
 		});
-		wrapperStatements.push(createWrapTwinObjectDeclaration(type));
+		wrapperClassMembers.push(createWrapTwinObjectDeclaration(type));
 		wrapperStatements.push(createWrapperClassDecleration(cl.name!.getText(), wrapperClassMembers))
 		return new StatementCodeGenContext([]);
 	}

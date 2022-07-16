@@ -202,15 +202,16 @@ export function createLoadModuleStatements(moduleName: string, imports: ts.Prope
 	];
 }
 
-export function createWrapTwinObjectDeclaration(type: ts.Type): ts.FunctionDeclaration {
+export function createWrapTwinObjectDeclaration(type: ts.Type): ts.MethodDeclaration {
 
 	const typeName: string = type.getSymbol()!.getName();
 
-	let wrapTwinObjectDeclaration = ts.factory.createFunctionDeclaration(
+	let wrapTwinObjectDeclaration = ts.factory.createMethodDeclaration(
 		undefined,
-		undefined,
+		[ ts.factory.createModifier(ts.SyntaxKind.StaticKeyword) ],
 		undefined,
 		'wrapTwinObject',
+		undefined,
 		undefined,
 		[ ts.factory.createParameterDeclaration(
 			undefined,

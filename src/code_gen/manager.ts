@@ -7,6 +7,11 @@ import * as ib from "./llvm/instruction_buffer.js"
 let program: ts.Program;
 let sourceFilePath: string;
 
+//TODO: find a more suitable place for this list.
+export let importedFunctions: string[];
+
+//TODO: merge with importedFunctions (maybe wrap with an imports class?) and make more general
+export let importedFunctionsNodes: ts.PropertyAccessExpression[];
 
 export let checker: ts.TypeChecker;
 export let printer: ts.Printer;
@@ -31,6 +36,9 @@ export function InitManager(sourceFile: string, outputDir: string): void {
 	irOutputPath = path.join(outputDir, `${fileName}.llvm`);
 	const fileBase: string = path.parse(sourceFile).base;
 	wrapperOutputPath = path.join(outputDir, fileBase);
+
+	importedFunctions = [];
+	importedFunctionsNodes = [];
 }
 
 export function getSourceFile(): ts.SourceFile {

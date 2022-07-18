@@ -10,32 +10,6 @@ import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./t
 import * as wg from "./ts/wrapper_gen"
 import * as llvm_utils from "./llvm/utils";
 
-class StatementCodeGenContext {
-	public nextList: inst.BpEntry[] = [];
-
-	constructor(nextList: inst.BpEntry[]) {
-		this.nextList = nextList;
-	}
-
-	isEmpty(): boolean {
-		return this.nextList.length == 0;
-	}
-}
-
-interface ExpressionCodeGenContext  {
-	isValueSaved: boolean;
-}
-
-class SavedExpressionCodeGenContext implements ExpressionCodeGenContext {
-	readonly isValueSaved: boolean = true;
-
-	public reg: number;
-
-	constructor(reg: number) {
-		this.reg = reg;
-	}
-}
-
 //TODO: find a more suitable place for this list.
 let importedFunctions: string[] = [];
 
@@ -157,13 +131,13 @@ function processAssignmentExpression(exp: ts.BinaryExpression): number {
 	else {
 		assert(exp.left.kind == ts.SyntaxKind.PropertyAccessExpression);
 		//TODO: add assertion of the property access being a property and not function
-		let leftCgCtx: SavedExpressionCodeGenContext = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
-		cgm.iBuff.emit(new inst.StoreInstruction(leftCgCtx.reg, rightReg, cgm.checker.getTypeAtLocation(exp.right)));
+		let leftReg = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
+		cgm.iBuff.emit(new inst.StoreInstruction(leftReg, rightReg, cgm.checker.getTypeAtLocation(exp.right)));
 	}
 	return rightReg;
 }
 
-function emitGetPropertyAddress(exp: ts.PropertyAccessExpression): SavedExpressionCodeGenContext {
+function emitGetPropertyAddress(exp: ts.PropertyAccessExpression): number {
 	let ptrReg: number = cgm.iBuff.getNewReg();
 	let objReg: number;
 	let objType: ts.Type = cgm.checker.getTypeAtLocation(exp.expression);
@@ -176,15 +150,15 @@ function emitGetPropertyAddress(exp: ts.PropertyAccessExpression): SavedExpressi
 		objReg = cgm.regMap.get((exp.expression as ts.Identifier).getText())!;
 	}
 	cgm.iBuff.emit(new inst.GetElementInstruction(ptrReg, objReg, objType, propIndex))
-	return new SavedExpressionCodeGenContext(ptrReg);
+	return ptrReg;
 }
 
-function emitLoadProperty(exp: ts.PropertyAccessExpression): SavedExpressionCodeGenContext {
-	let addressCgCtx = emitGetPropertyAddress(exp);
+function emitLoadProperty(exp: ts.PropertyAccessExpression): number {
+	let addressReg = emitGetPropertyAddress(exp);
 	let resReg = cgm.iBuff.getNewReg();
 	let valType: ts.Type = cgm.checker.getTypeAtLocation(exp);
-	cgm.iBuff.emit(new inst.LoadInstruction(addressCgCtx.reg, resReg, valType))
-	return new SavedExpressionCodeGenContext(resReg);
+	cgm.iBuff.emit(new inst.LoadInstruction(addressReg, resReg, valType))
+	return resReg;
 }
 
 function processSourceFile(file: ts.SourceFile): ts.SourceFile {
@@ -394,7 +368,7 @@ function processExpression(exp: ts.Expression): number {
 			return processNewExpression(exp as ts.NewExpression);
 			break;
 		case ts.SyntaxKind.PropertyAccessExpression:
-			return emitLoadProperty(exp as ts.PropertyAccessExpression).reg;
+			return emitLoadProperty(exp as ts.PropertyAccessExpression);
 			break;
 		case ts.SyntaxKind.CallExpression:
 			return processCallExpression(exp as ts.CallExpression);

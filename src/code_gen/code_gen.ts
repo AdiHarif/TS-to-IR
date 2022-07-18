@@ -36,22 +36,6 @@ class SavedExpressionCodeGenContext implements ExpressionCodeGenContext {
 	}
 }
 
-class UnsavedExpressionCodeGenContext implements ExpressionCodeGenContext {
-	readonly isValueSaved: boolean = false;
-	readonly typeFlags: ts.TypeFlags = ts.TypeFlags.Boolean;
-
-	public trueList: inst.BpEntry[] = [];
-	public falseList: inst.BpEntry[] = [];
-
-	constructor(trueList: inst.BpEntry[], falseList: inst.BpEntry[]) {
-		this.trueList = trueList;
-		this.falseList = falseList;
-	}
-
-}
-
-type CodeGenContext = StatementCodeGenContext | ExpressionCodeGenContext;
-
 //TODO: find a more suitable place for this list.
 let importedFunctions: string[] = [];
 
@@ -442,7 +426,6 @@ function processBinaryExpression(binaryExpression: ts.BinaryExpression): number 
 	}
 }
 
-//TODO: refactor this function ASAP
 function processCallExpression(callExpression: ts.CallExpression): number {
 
 	let paramRegs: inst.TypedReg[] = [];

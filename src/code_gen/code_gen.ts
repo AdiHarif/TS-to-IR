@@ -89,12 +89,12 @@ function emitFunctionDefinition(fun: ts.FunctionLikeDeclaration, cls?: ts.Type):
 	cgm.iBuff.emit(new inst.FunctionDefinitionInstruction(id, retType, paramTypes));
 }
 
-function emitNumericBinaryExpression(exp: ts.BinaryExpression): SavedExpressionCodeGenContext {
+function processArithmeticBinaryExpression(exp: ts.BinaryExpression): number {
 	const leftReg = processExpression(exp.left);
 	const rightReg = processExpression(exp.right);
 	const resReg = cgm.iBuff.getNewReg();
 	cgm.iBuff.emit(new inst.NumericOpInstruction(resReg, leftReg, rightReg, exp.operatorToken.kind));
-	return new SavedExpressionCodeGenContext(resReg);
+	return resReg;
 }
 
 //TODO: re-implement this function when taking care of boolean expressions
@@ -121,17 +121,17 @@ function emitNumericBinaryExpression(exp: ts.BinaryExpression): SavedExpressionC
 
 // }
 
-function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: inst.TypedReg[]): SavedExpressionCodeGenContext {
+function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: inst.TypedReg[]): number {
 	//TODO: remove allocating new reg for void functions
 	const retReg: inst.TypedReg = {
 		reg: cgm.iBuff.getNewReg(),
 		type: retType
 	};
 	cgm.iBuff.emit(new inst.FunctionCallInstruction(retReg, name, paramRegs));
-	return new SavedExpressionCodeGenContext(retReg.reg);
+	return retReg.reg;
 }
 
-function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenContext {
+function processNewExpression(newExp: ts.NewExpression): number {
 	let objType: ts.Type = cgm.checker.getDeclaredTypeOfSymbol(cgm.checker.getSymbolAtLocation(newExp.expression as ts.Identifier)!);
 	let paramRegs: inst.TypedReg[] = [];
 	//TODO: wrap this part with 'emitArguments' or something similar and merge with compileNode CallExpression case
@@ -149,7 +149,7 @@ function emitNewExpression(newExp: ts.NewExpression): SavedExpressionCodeGenCont
 	return emitFunctionCall(objType, funcName, paramRegs);
 }
 
-function emitAssignment(exp: ts.BinaryExpression): number {
+function processAssignmentExpression(exp: ts.BinaryExpression): number {
 	let rightReg = processExpression(exp.right);
 	if (exp.left.kind == ts.SyntaxKind.Identifier) {
 		cgm.regMap.set((exp.left as ts.Identifier).getText(), rightReg);
@@ -391,7 +391,7 @@ function processExpression(exp: ts.Expression): number {
 			return processBinaryExpression(exp as ts.BinaryExpression);
 			break;
 		case ts.SyntaxKind.NewExpression:
-			return emitNewExpression(exp as ts.NewExpression).reg;
+			return processNewExpression(exp as ts.NewExpression);
 			break;
 		case ts.SyntaxKind.PropertyAccessExpression:
 			return emitLoadProperty(exp as ts.PropertyAccessExpression).reg;
@@ -416,10 +416,10 @@ function processNumericLiteral(numericLiteral: ts.NumericLiteral): number {
 function processBinaryExpression(binaryExpression: ts.BinaryExpression): number {
 	const typeFlags = cgm.checker.getTypeAtLocation(binaryExpression).flags;
 	if ((binaryExpression as ts.BinaryExpression).operatorToken.kind == ts.SyntaxKind.EqualsToken) {
-		return emitAssignment(binaryExpression as ts.BinaryExpression);
+		return processAssignmentExpression(binaryExpression as ts.BinaryExpression);
 	}
 	else if (typeFlags & ts.TypeFlags.Number) {
-		return emitNumericBinaryExpression(binaryExpression as ts.BinaryExpression).reg;
+		return processArithmeticBinaryExpression(binaryExpression as ts.BinaryExpression);
 	}
 	else {
 		throw new Error('unsupported expression type');
@@ -456,7 +456,7 @@ function processCallExpression(callExpression: ts.CallExpression): number {
 		cgm.iBuff.emitFunctionDeclaration(new inst.FunctionDeclarationInstruction(funcName, retType, paramTypes))
 	}
 
-	return emitFunctionCall(retType, funcName, paramRegs).reg;
+	return emitFunctionCall(retType, funcName, paramRegs);
 }
 
 function isCallExpressionImported(callExpression: ts.CallExpression): boolean {

@@ -33,16 +33,16 @@ function processSourceFile(file: ts.SourceFile): ts.SourceFile {
 		switch (st.kind) {
 			case ts.SyntaxKind.ClassDeclaration:
 				wrapperStatement = processClassDecleration(st as ts.ClassDeclaration);
-				wrapperFileStatements.push(wrapperStatement);
 				break;
 			case ts.SyntaxKind.FunctionDeclaration:
 				//TODO: create wrapper function if declaration is exported
-				processFunctionDeclaration(st as ts.FunctionDeclaration);
+				wrapperStatement = processFunctionDeclaration(st as ts.FunctionDeclaration);
 				break;
 			default:
-				wrapperFileStatements.push(cloneNode(st));
+				wrapperStatement = cloneNode(st);
 				break;
 		}
+		wrapperFileStatements.push(wrapperStatement);
 	});
 	wrapperFileStatements.push(...createLoadModuleStatements(cgm.getWasmFileName(), cgm.importedFunctionsNodes));
 	return wg.createWrapperSourceFile(wrapperFileStatements);
@@ -119,7 +119,7 @@ function processMethodDeclaration(methodDeclaration: ts.MethodDeclaration, class
 
 }
 
-function processFunctionDeclaration(functionDecleration: ts.FunctionDeclaration): void {
+function processFunctionDeclaration(functionDecleration: ts.FunctionDeclaration): ts.Statement {
 	const signature = cgm.checker.getSignatureFromDeclaration(functionDecleration)!;
 	let paramTypes: ts.Type[] = [];
 	cgm.regMap.clear();
@@ -142,6 +142,7 @@ function processFunctionDeclaration(functionDecleration: ts.FunctionDeclaration)
 	}
 
 	cgm.iBuff.emit(new inst.FunctionEndInstruction());
+	return wg.createWrapperFunctionDeclaration(functionDecleration);
 }
 
 function processStatement(st: ts.Statement): void {

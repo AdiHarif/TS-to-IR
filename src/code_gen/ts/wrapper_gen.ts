@@ -3,6 +3,8 @@ import * as ts from 'typescript'
 
 import * as cgm from '../manager.js'
 import { methodDeclarationToIrName } from '../llvm/utils';
+import * as talt from "talt"
+import { cloneNode } from 'ts-clone-node';
 
 export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.MethodDeclaration {
 
@@ -246,4 +248,38 @@ export function createWrapperSourceFile(statements: ts.Statement[]): ts.SourceFi
 		ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
 		ts.NodeFlags.None
 	);
+}
+
+export function createWrapperFunctionDeclaration(functionDeclaration: ts.FunctionDeclaration): ts.FunctionDeclaration {
+
+	let bodyExpression = ts.factory.createCallExpression(
+		talt.template.expression`
+			(moduleExports.${functionDeclaration.name!.text} as Function)
+		`(),
+		undefined,
+		functionDeclaration.parameters.map(param =>
+			ts.factory.createIdentifier(param.name.getText())
+		)
+	)
+
+	let bodyStatement: ts.Statement;
+	if (!(cgm.checker.getReturnTypeOfSignature(cgm.checker.getSignatureFromDeclaration(functionDeclaration)!).flags & ts.TypeFlags.Void)) {
+		bodyStatement = ts.factory.createReturnStatement(bodyExpression)
+	}
+	else {
+		bodyStatement = ts.factory.createExpressionStatement(bodyExpression);
+	}
+
+	const wrapperFunctionDeclaration = ts.factory.createFunctionDeclaration(
+		functionDeclaration.decorators,
+		functionDeclaration.modifiers,
+		functionDeclaration.asteriskToken,
+		functionDeclaration.name,
+		functionDeclaration.typeParameters,
+		functionDeclaration.parameters,
+		functionDeclaration.type,
+		ts.factory.createBlock([ bodyStatement ])
+	)
+
+	return wrapperFunctionDeclaration;
 }

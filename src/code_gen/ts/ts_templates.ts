@@ -1,11 +1,13 @@
 
 import * as ts from "typescript"
+import * as talt from "talt"
 
 import { expressionIrName } from "../llvm/utils";
+import * as cgm from "../manager"
 
 export function createLoadModuleDeclaration(moduleName: string, imports: ts.PropertyAccessExpression[]): ts.FunctionDeclaration {
 
-	let importsObjectLiteral: ts.ObjectLiteralExpression = ts.factory.createObjectLiteralExpression(
+	const importsObjectLiteral: ts.ObjectLiteralExpression = ts.factory.createObjectLiteralExpression(
 		imports.map((exp) => {
 			return ts.factory.createPropertyAssignment(
 				expressionIrName(exp),
@@ -18,158 +20,58 @@ export function createLoadModuleDeclaration(moduleName: string, imports: ts.Prop
 		true
 	);
 
-	let importsVariableStatement: ts.VariableStatement = ts.factory.createVariableStatement(
-		undefined,
-		ts.factory.createVariableDeclarationList(
-			[ ts.factory.createVariableDeclaration(
-				'imports',
-				undefined,
-				ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(
-					ts.factory.createIdentifier('WebAssembly'),
-					ts.factory.createIdentifier('Imports')
-				)),
-				ts.factory.createObjectLiteralExpression(
-					[ ts.factory.createPropertyAssignment(
-							'env',
-							importsObjectLiteral
-					)],
-					true
-				)
-			)],
-			ts.NodeFlags.Const
-		)
-	);
+	const importsDeclaration: ts.Statement = talt.template.statement`
+		const imports: WebAssembly.Imports = {
+			env: IMPORTS_OBJECT_LITERAL
+		}
+	`({ IMPORTS_OBJECT_LITERAL: importsObjectLiteral });
 
-	let arrayBufferArrowFunction = ts.factory.createArrowFunction(
-		undefined,
-		undefined,
-		[ ts.factory.createParameterDeclaration(
-			undefined,
-			undefined,
-			undefined,
-			'res'
-		)],
-		undefined,
-		ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-		ts.factory.createCallExpression(
-			ts.factory.createPropertyAccessExpression(
-				ts.factory.createIdentifier('res'),
-				ts.factory.createIdentifier('arrayBuffer')
-			),
-			undefined,
-			undefined
-		)
-	);
+	const bufferDeclaration = talt.template.statement`let buffer: ArrayBuffer;`();
 
-	let bufferVariableStatement: ts.VariableStatement = ts.factory.createVariableStatement(
+	const bufferLoadingStatement: ts.Statement = talt.template.statement`
+		if (typeof process !== "undefined" && process.versions.node) {
+			const fs = await import('fs');
+			buffer = fs.readFileSync("${cgm.getWasmFileName()}");
+		}
+			else {
+			buffer = await fetch("${cgm.getWasmFileName()}").then(res => res.arrayBuffer());
+		}
+	`();
+
+	const moduleDeclaration = talt.template.statement`
+		const module = await WebAssembly.compile(buffer);
+	`();
+
+	const instanceDeclaration = talt.template.statement`
+		const instance = await WebAssembly.instantiate(module, imports);
+	`();
+
+	const moduleExportsAssignment = talt.template.statement`
+		moduleExports = instance.exports;
+	`();
+
+	// talt doesnt support instantiating templates with if statements at the moment
+	const functionDeclaration = ts.factory.createFunctionDeclaration(
 		undefined,
-		ts.factory.createVariableDeclarationList(
-			[ ts.factory.createVariableDeclaration(
-				'buffer',
-				undefined,
-				undefined,
-				ts.factory.createAwaitExpression(ts.factory.createCallExpression(
-					ts.factory.createPropertyAccessExpression(
-						ts.factory.createCallExpression(
-							ts.factory.createPropertyAccessExpression(
-								ts.factory.createCallExpression(
-									ts.factory.createIdentifier('fetch'),
-									undefined,
-									[ ts.factory.createStringLiteral(moduleName) ]
-								),
-								'then'
-							),
-							undefined,
-							[ arrayBufferArrowFunction ]
-						),
-						'then'
-					),
-					undefined,
-					undefined
-				))
-			)],
-			ts.NodeFlags.Const
-		)
-	);
-
-	let moduleVariableStatement = ts.factory.createVariableStatement(
-		undefined,
-		ts.factory.createVariableDeclarationList(
-			[ ts.factory.createVariableDeclaration(
-				'module',
-				undefined,
-				undefined,
-				ts.factory.createAwaitExpression(ts.factory.createCallExpression(
-					ts.factory.createPropertyAccessExpression(
-						ts.factory.createCallExpression(
-							ts.factory.createPropertyAccessExpression(
-								ts.factory.createIdentifier('WebAssembly'),
-								ts.factory.createIdentifier('compile')
-							),
-							undefined,
-							[ts.factory.createIdentifier('buffer')]
-						),
-						'then'
-					),
-					undefined,
-					undefined
-				))
-			)],
-			ts.NodeFlags.Const
-		)
-	);
-
-	let instanceVariableStatement = ts.factory.createVariableStatement(
-		undefined,
-		ts.factory.createVariableDeclarationList(
-			[ ts.factory.createVariableDeclaration(
-				'instance',
-				undefined,
-				undefined,
-				ts.factory.createAwaitExpression(ts.factory.createCallExpression(
-					ts.factory.createPropertyAccessExpression(
-						ts.factory.createIdentifier('WebAssembly'),
-						ts.factory.createIdentifier('instantiate')
-					),
-					undefined,
-					[
-						ts.factory.createIdentifier('module'),
-						ts.factory.createIdentifier('imports')
-					]
-				))
-			)],
-			ts.NodeFlags.Const
-		)
-	);
-
-	let moduleExportsAssignment = ts.factory.createExpressionStatement(ts.factory.createBinaryExpression(
-		ts.factory.createIdentifier('moduleExports'),
-		ts.SyntaxKind.EqualsToken,
-		ts.factory.createPropertyAccessExpression(
-			ts.factory.createIdentifier('instance'),
-			ts.factory.createIdentifier('exports')
-		)
-	))
-
-	let statements: ts.Statement[] = [
-		importsVariableStatement,
-		bufferVariableStatement,
-		moduleVariableStatement,
-		instanceVariableStatement,
-		moduleExportsAssignment
-	];
-
-	return ts.factory.createFunctionDeclaration(
-		undefined,
-		[ ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword) ],
+		[ ts.factory.createToken(ts.SyntaxKind.AsyncKeyword) ],
 		undefined,
 		'loadModule',
 		undefined,
 		[],
 		undefined,
-		ts.factory.createBlock(statements, true)
-	);
+		ts.factory.createBlock([
+			importsDeclaration,
+			bufferDeclaration,
+			bufferLoadingStatement,
+			moduleDeclaration,
+			instanceDeclaration,
+			moduleExportsAssignment
+		], true)
+	)
+
+	return functionDeclaration;
 }
+
 
 export function createLoadModuleStatements(moduleName: string, imports: ts.PropertyAccessExpression[]): ts.Statement[] {
 

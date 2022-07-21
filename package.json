@@ -19,6 +19,7 @@
     "@types/node": "^17.0.23"
   },
   "dependencies": {
+    "talt": "^2.3.1",
     "ts-command-line-args": "^2.3.1"
   }
 }

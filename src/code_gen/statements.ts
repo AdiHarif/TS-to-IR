@@ -44,7 +44,7 @@ function processSourceFile(file: ts.SourceFile): ts.SourceFile {
 		}
 		wrapperFileStatements.push(wrapperStatement);
 	});
-	wrapperFileStatements.push(...createLoadModuleStatements(cgm.getWasmFileName(), cgm.importedFunctionsNodes));
+	wrapperFileStatements.splice(0, 0, ...createLoadModuleStatements(cgm.getWasmFileName(), cgm.importedFunctionsNodes));
 	return wg.createWrapperSourceFile(wrapperFileStatements);
 }
 

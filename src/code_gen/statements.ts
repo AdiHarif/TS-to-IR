@@ -1,6 +1,7 @@
 
 import * as ts from "typescript"
 import { writeFileSync } from "fs"
+import { cloneNode } from "ts-clone-node"
 
 import * as cgm from "./manager.js"
 import * as inst from "./llvm/instructions"
@@ -39,8 +40,7 @@ function processSourceFile(file: ts.SourceFile): ts.SourceFile {
 				processFunctionDeclaration(st as ts.FunctionDeclaration);
 				break;
 			default:
-				//TODO: add copying top level statements to wrapper
-				throw new Error("top level statements arent supported");
+				wrapperFileStatements.push(cloneNode(st));
 				break;
 		}
 	});

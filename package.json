@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "talt": "^2.3.1",
+    "ts-clone-node": "^1.0.0",
     "ts-command-line-args": "^2.3.1"
   }
 }

@@ -1,6 +1,6 @@
 
 //TODO: cleanup this import
-import { Instruction, StructDefinitionInstruction, LabelInstruction, PatchableInstruction, BpEntry, FunctionDefinitionInstruction, FunctionDeclarationInstruction, FunctionEndInstruction } from "./instructions.js"
+import { Instruction, StructDefinitionInstruction, LabelInstruction, FunctionDefinitionInstruction, FunctionDeclarationInstruction, FunctionEndInstruction } from "./instructions.js"
 export class InstructionBuffer {
 	private declarationsBuffer: FunctionDeclarationInstruction[] = [];
 	private dataBuffer: Instruction[] = [];
@@ -37,10 +37,6 @@ export class InstructionBuffer {
 
 	getNewReg(): number {
 		return ++this.regCount;
-	}
-
-	backPatch(entries: BpEntry[], label: number) {
-		entries.forEach(ent => (this.codeBuffer[ent.instruction] as PatchableInstruction).patch(label, ent.index));
 	}
 
 	dumpBuffer(): string {

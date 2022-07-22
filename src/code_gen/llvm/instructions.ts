@@ -8,9 +8,13 @@ export type TypedReg = {
 	type: ts.Type | null;
 }
 
-export type BpEntry = {
-	instruction: number;
-	index: 0 | 1; //0 means the first label of the instruction, 1 means the second (should be 0 for single label instructions)
+export class BackpatchEntry {
+	//index 0 means the first label of the instruction, 1 means the second (should be 0 for single label instructions)
+	constructor(private instruction: PatchableInstruction, private index: 0 | 1) {};
+
+	patch(label: number): void {
+		this.instruction.patch(label, this.index);
+	}
 }
 
 export interface Instruction {

@@ -5,8 +5,7 @@ source ./scripts/script_utils.sh
 TESTS_DIR="./tests"
 LLVM_UTIL_DIR="../../res"
 
-COMPILE_COMMAND="node ../../build/app.js"
-LINK_COMMAND="llvm-link -S"
+PROCESSING_COMMAND="node ../../build/app.js"
 
 throw_error() {
 	error_message=$1
@@ -25,39 +24,45 @@ run_test() {
 
 	source_file="$test_name.ts"
 	llvm_file="$test_name.llvm"
-	echo "Compiling $source_file to $llvm_file."
-	$COMPILE_COMMAND $source_file > $llvm_file || throw_error "Compilation failed."
-	echo "$llvm_file created successfully."
+	wasm_file="$test_name.wasm"
+	prelink_wasm_file="prelink_$wasm_file"
+	test_out_dir="test_out"
+	mkdir $test_out_dir
 
-	echo "Linking $llvm_file whith llvm util files"
-	llvm_util_files="$(ls $LLVM_UTIL_DIR/*.llvm)"
-	llvm_full_file=$test_name"_full.llvm"
-	$LINK_COMMAND $llvm_file $llvm_util_files -o $llvm_full_file || throw_error "Linkage failed"
+	rm -rf $test_out_dir/*
 
-	echo "Running $llvm_full_file with input files."
-	for in_file in *.in ; do
-		io_name=${in_file%.*}
-		res_file="$io_name.res"
-		llvm_cmd="lli $llvm_full_file"
-		#TODO: add handling return value of main function and checking exit status
-		$llvm_cmd < $in_file > $res_file # || throw_error "lli failed with $llvm_full_file and $in_file as input"
-		out_file="$io_name.out"
-		diff $res_file $out_file || throw_error "Output is not as expected with $in_file as input"
-	done
-	io_count=$(ls -l *.in | wc -l)
-	echo "All outputs($io_count) for the test matched the expected output."
+	echo "Processing $source_file"
+	$PROCESSING_COMMAND $source_file -o $test_out_dir || throw_error "Processing failed"
+	echo "$source_file precessed successfully"
 
-	popd
+	pushd $test_out_dir
+	echo "Compiling $llvm_file to prelinked wasm"
+	llc --march=wasm32 --filetype=obj $llvm_file -o $prelink_wasm_file || throw_error "LLVM compilation failed"
+
+	echo "Linking $wasm_file"
+	wasm-ld --export-all --no-entry --allow-undefined $prelink_wasm_file -o $wasm_file || throw_error "Linking failed"
+
+	wrapper_file=$source_file
+	echo "Compiling $wrapper_file (wrapper)"
+	tsc $wrapper_file --target ESNEXT --module ESNEXT || throw_error "Wrapper compilation failed"
+
+	js_file="$test_name.js"
+	echo "Running $js_file with $wasm_file module"
+	node $js_file || throw_error "Run failed"
 
 	echo "=== Test passed ==="
 	echo ""
+	popd
+	popd
 }
 
 run_all_tests() {
 	pushd $TESTS_DIR
 
-	for d in * ; do
-		run_test $d
+	for dir in * ; do
+		if [[ -d $dir ]]; then
+			run_test $dir
+		fi
 	done
 
 	popd

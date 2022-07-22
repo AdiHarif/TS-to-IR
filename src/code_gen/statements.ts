@@ -10,8 +10,21 @@ import * as cg_utils from "./code_gen_utils"
 import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts/ts_templates";
 import { emitObjectFieldGetter, emitObjectFieldSetter, emitObjectAllocationFunctionDefinition } from "./llvm/llvm_templates"
 import { emitFunctionDefinition } from "./llvm/emit"
-import { processExpression } from "./expressions"
+import { processExpression, processBooleanBinaryExpression } from "./expressions"
 
+class StatementSynthesizedContext {
+	static readonly emptyContext = new StatementSynthesizedContext([]);
+
+	constructor(readonly nextList: inst.BackpatchEntry[]) {};
+
+	patchNextList(label: number): void {
+		this.nextList.forEach(entry => entry.patch(label));
+	}
+
+	isEmpty(): boolean {
+		return (this.nextList.length == 0);
+	}
+}
 
 export function processProgram(): void {
 
@@ -134,10 +147,12 @@ function processFunctionDeclaration(functionDecleration: ts.FunctionDeclaration)
 
 	cgm.iBuff.emit(new inst.FunctionDefinitionInstruction(id, retType, paramTypes));
 
-	functionDecleration.body!.statements.forEach(processStatement);
+	const bodyContext = processBlock(functionDecleration.body!);
 
 	//TODO: make this if more readable
 	if ( cgm.checker.getReturnTypeOfSignature(cgm.checker.getSignatureFromDeclaration(functionDecleration)!).flags & ts.TypeFlags.Void) {
+		const label = cgm.iBuff.emitNewLabel();
+		bodyContext.patchNextList(label);
 		cgm.iBuff.emit(new inst.ReturnInstruction(null));
 	}
 
@@ -145,7 +160,8 @@ function processFunctionDeclaration(functionDecleration: ts.FunctionDeclaration)
 	return wg.createWrapperFunctionDeclaration(functionDecleration);
 }
 
-function processStatement(st: ts.Statement): void {
+function processStatement(st: ts.Statement): StatementSynthesizedContext {
+	let statementContext = StatementSynthesizedContext.emptyContext;
 	switch (st.kind) {
 		case ts.SyntaxKind.ExpressionStatement:
 			processExpression((st as ts.ExpressionStatement).expression);
@@ -157,15 +173,16 @@ function processStatement(st: ts.Statement): void {
 			processReturnStatement(st as ts.ReturnStatement);
 			break;
 		case ts.SyntaxKind.Block:
-			(st as ts.Block).statements.forEach(processStatement);
+			statementContext = processBlock(st as ts.Block);
 			break;
 		case ts.SyntaxKind.IfStatement:
-			processIfStatement(st as ts.IfStatement);
+			statementContext = processIfStatement(st as ts.IfStatement);
 			break;
 		default:
 			throw new Error(`unsupported statement kind: ${ts.SyntaxKind[st.kind]}`);
 			break;
 	}
+	return statementContext;
 }
 
 function processVariableDeclerationsList(list: ts.VariableDeclarationList): void {
@@ -194,23 +211,38 @@ function processReturnStatement(returnStatement: ts.ReturnStatement): void {
 	cgm.iBuff.emit(retInst);
 }
 
-function processIfStatement(st: ts.IfStatement): void {
-	throw new Error('if statements are currently broken');
-	//TODO: this is an old implementation, should be reviewed
-	// const ifStat = node as ts.IfStatement;
-	// const expCgCtx = processNode(ifStat.expression) as UnsavedExpressionCodeGenContext; //TODO: handle cases where the expression is an identifier/constant value (saved value in general)
-	// const trueLabel = cgm.iBuff.emitNewLabel();
+function processBlock(block: ts.Block): StatementSynthesizedContext {
 
-	// cgm.iBuff.backPatch((expCgCtx as UnsavedExpressionCodeGenContext).trueList, trueLabel);
-	// const thenBpCtx = processNode(ifStat.thenStatement) as StatementCodeGenContext;
+	let statementContext = StatementSynthesizedContext.emptyContext;
+	block.statements.forEach(statement => {
+		if (!statementContext.isEmpty()) {
+			const label = cgm.iBuff.emitNewLabel();
+			statementContext.patchNextList(label);
+		}
+		statementContext = processStatement(statement);
+	});
+	return statementContext;
+}
 
-	// if (ifStat.elseStatement){
-	// 	const falseLabel = cgm.iBuff.emitNewLabel();
-	// 	cgm.iBuff.backPatch(expCgCtx.falseList, falseLabel);
-	// 	const elseBpCtx = processNode(ifStat.elseStatement) as StatementCodeGenContext;
-	// 	return new StatementCodeGenContext(elseBpCtx.nextList.concat(thenBpCtx.nextList));
-	// }
-	// else { //no else statement
-	// 	return new StatementCodeGenContext(expCgCtx.falseList.concat(thenBpCtx.nextList));
-	// }
+function processIfStatement(ifStatement: ts.IfStatement): StatementSynthesizedContext {
+	//throw new Error('if statements are currently broken');
+	/**
+	 * assumptions:
+	 * - the expression checked is a binary expression with boolean type
+	 */
+	//TODO: handle cases where the expression is an identifier/constant value (saved value in general)
+	const expressionContext = processBooleanBinaryExpression(ifStatement.expression as ts.BinaryExpression);
+	const trueLabel = cgm.iBuff.emitNewLabel();
+	expressionContext.patchTrueList(trueLabel);
+	const thenContext = processStatement(ifStatement.thenStatement);
+
+	if (ifStatement.elseStatement){
+		const falseLabel = cgm.iBuff.emitNewLabel();
+		expressionContext.patchFalseList(falseLabel);
+		const elseContext = processStatement(ifStatement.elseStatement);
+		return new StatementSynthesizedContext([ ...thenContext.nextList, ...elseContext.nextList ]);
+	}
+	else { //no else statement
+		return new StatementSynthesizedContext([ ...thenContext.nextList, ...expressionContext.falseList ]);
+	}
 }

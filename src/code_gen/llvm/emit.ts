@@ -38,30 +38,11 @@ export function emitFunctionDefinition(fun: ts.FunctionLikeDeclaration, cls?: ts
 	cgm.iBuff.emit(new inst.FunctionDefinitionInstruction(id, retType, paramTypes));
 }
 
-
-//TODO: re-implement this function when taking care of boolean expressions
-// function emitBooleanBinaryExpression(exp: ts.BinaryExpression): UnsavedExpressionCodeGenContext {
-// 	const leftCtx = processNode(exp.left) as SavedExpressionCodeGenContext;
-// 	const rightCtx = processNode(exp.right) as SavedExpressionCodeGenContext;
-// 	switch (exp.operatorToken.kind) {
-// 		case ts.SyntaxKind.LessThanToken:
-// 		case ts.SyntaxKind.LessThanEqualsToken:
-// 		case ts.SyntaxKind.GreaterThanToken:
-// 		case ts.SyntaxKind.GreaterThanEqualsToken:
-// 		case ts.SyntaxKind.EqualsEqualsToken:
-// 		case ts.SyntaxKind.ExclamationEqualsToken:
-// 			let resReg = cgm.iBuff.getNewReg();
-// 			cgm.iBuff.emit(new inst.EqualityOpInstruction(resReg, leftCtx.reg, rightCtx.reg, exp.operatorToken.kind));
-// 			let brInst = cgm.iBuff.emit(new inst.ConditionalBranchInstruction(resReg));
-// 			let trueEntry: inst.BpEntry = { instruction: brInst, index: 0 };
-// 			let falseEntry: inst.BpEntry = { instruction: brInst, index: 1 };
-// 			return new UnsavedExpressionCodeGenContext([trueEntry], [falseEntry]);
-// 			break;
-// 		default:
-// 			throw new Error("unsupported binary op: " + ts.SyntaxKind[exp.operatorToken.kind]);
-// 	}
-
-// }
+export function emitBinaryBooleanOperation(leftReg: number, rightReg: number, operator: ts.BinaryOperator): number {
+	let resReg = cgm.iBuff.getNewReg();
+	cgm.iBuff.emit(new inst.EqualityOpInstruction(resReg, leftReg, rightReg, operator));
+	return resReg;
+}
 
 export function emitFunctionCall(retType: ts.Type | null, name: string, paramRegs: inst.TypedReg[]): number {
 	//TODO: remove allocating new reg for void functions

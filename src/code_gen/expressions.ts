@@ -5,7 +5,21 @@ import * as cgm from "./manager.js"
 import * as inst from "./llvm/instructions"
 import * as cg_utils from "./code_gen_utils"
 import * as llvm_utils from "./llvm/utils"
-import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty } from "./llvm/emit"
+import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation } from "./llvm/emit"
+
+class ExpressionSynthesizedContext {
+	static readonly emptyContext = new ExpressionSynthesizedContext([], []);
+
+	constructor(readonly trueList: inst.BackpatchEntry[], readonly falseList: inst.BackpatchEntry[]) {};
+
+	patchTrueList(label: number) {
+		this.trueList.forEach(entry => entry.patch(label));
+	}
+
+	patchFalseList(label: number) {
+		this.falseList.forEach(entry => entry.patch(label));
+	}
+}
 
 function processArithmeticBinaryExpression(exp: ts.BinaryExpression): number {
 	const leftReg = processExpression(exp.left);
@@ -131,3 +145,13 @@ function processCallExpression(callExpression: ts.CallExpression): number {
 	return emitFunctionCall(retType, funcName, paramRegs);
 }
 
+export function processBooleanBinaryExpression(binaryExpression: ts.BinaryExpression): ExpressionSynthesizedContext {
+	const leftReg: number = processExpression(binaryExpression.left);
+	const rightReg: number = processExpression(binaryExpression.right);
+	const resReg: number = emitBinaryBooleanOperation(leftReg, rightReg, binaryExpression.operatorToken.kind);
+	const branchInstruction = new inst.ConditionalBranchInstruction(resReg);
+	cgm.iBuff.emit(branchInstruction);
+	const trueEntry = new inst.BackpatchEntry(branchInstruction, 0);
+	const falseEntry = new inst.BackpatchEntry(branchInstruction, 1);
+	return new ExpressionSynthesizedContext([ trueEntry ], [ falseEntry ]);
+}

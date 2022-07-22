@@ -5,7 +5,8 @@ import * as cgm from "./manager.js"
 import * as inst from "./llvm/instructions"
 import * as cg_utils from "./code_gen_utils"
 import * as llvm_utils from "./llvm/utils"
-import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation } from "./llvm/emit"
+import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation, emitNegationInstruction } from "./llvm/emit"
+import { emit } from "process"
 
 class ExpressionSynthesizedContext {
 	static readonly emptyContext = new ExpressionSynthesizedContext([], []);
@@ -85,6 +86,9 @@ export function processExpression(exp: ts.Expression): number {
 		case ts.SyntaxKind.CallExpression:
 			return processCallExpression(exp as ts.CallExpression);
 			break;
+		case ts.SyntaxKind.PrefixUnaryExpression:
+			return processPrefixUnaryExpression(exp as ts.PrefixUnaryExpression);
+			break;
 		default:
 			throw new Error(`unsupported expression kind: ${ts.SyntaxKind[exp.kind]}`);
 			break;
@@ -154,4 +158,18 @@ export function processBooleanBinaryExpression(binaryExpression: ts.BinaryExpres
 	const trueEntry = new inst.BackpatchEntry(branchInstruction, 0);
 	const falseEntry = new inst.BackpatchEntry(branchInstruction, 1);
 	return new ExpressionSynthesizedContext([ trueEntry ], [ falseEntry ]);
+}
+
+function processPrefixUnaryExpression(prefixUnaryExpression: ts.PrefixUnaryExpression): number {
+	switch (prefixUnaryExpression.operator) {
+		case ts.SyntaxKind.PlusToken:
+			return processExpression(prefixUnaryExpression.operand);
+			break;
+		case ts.SyntaxKind.MinusToken:
+			const expReg = processExpression(prefixUnaryExpression.operand);
+			return emitNegationInstruction(expReg);
+			break;
+		default:
+			throw new Error(`unsupported prefixUnaryOperator: ${ts.SyntaxKind[prefixUnaryExpression.operator]}`);
+	}
 }

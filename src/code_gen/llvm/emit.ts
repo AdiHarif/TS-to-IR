@@ -77,3 +77,9 @@ export function emitLoadProperty(exp: ts.PropertyAccessExpression): number {
 	cgm.iBuff.emit(new inst.LoadInstruction(addressReg, resReg, valType))
 	return resReg;
 }
+
+export function emitNegationInstruction(argReg: number): number {
+	const resReg = cgm.iBuff.getNewReg();
+	cgm.iBuff.emit(new inst.NegationInstruction(resReg, argReg));
+	return resReg;
+}

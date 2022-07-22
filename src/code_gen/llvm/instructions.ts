@@ -131,6 +131,14 @@ export class NumericOpInstruction implements Instruction {
 	}
 }
 
+export class NegationInstruction implements Instruction {
+	constructor(private resReg: number, private argReg: number) {};
+
+	toLlvm(): string {
+		return `${regIndexToString(this.resReg)} = fsub ${typeFlagsToLlvmType(ts.TypeFlags.Number)} 0.0, ${regIndexToString(this.argReg)}`;
+	}
+}
+
 export class EqualityOpInstruction implements Instruction {
 	//TODO: merge somehow with NumericOpInstruction
 	private resReg: number;

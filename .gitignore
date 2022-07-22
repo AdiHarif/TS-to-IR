@@ -109,8 +109,7 @@ misc/
 .vscode/
 
 # Test tmp files
-tests/**/*.llvm
-tests/**/*.res
+tests/**/test_out/*
 
 res/Fireworks/build/*.js
 res/Fireworks/build/*.js.map

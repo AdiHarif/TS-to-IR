@@ -133,7 +133,8 @@ export class NumericOpInstruction implements Instruction {
 				llvmOp = "fdiv";
 				break;
 			default:
-				llvmOp = "unsupported-op";
+				throw new Error(`unsupported binary operator: ${ts.SyntaxKind[this.op]}`);
+				break;
 		}
 		return regIndexToString(this.resReg) + " = " + llvmOp + " " + typeFlagsToLlvmType(ts.TypeFlags.Number) + " " + regIndexToString(this.leftReg) + ", " +  regIndexToString(this.rightReg);
 	}
@@ -183,7 +184,8 @@ export class EqualityOpInstruction implements Instruction {
 				llvmCond = "one";
 				break;
 			default:
-				llvmCond = "unsupported-cond";
+				throw new Error(`unsupported binary operator: ${ts.SyntaxKind[this.op]}`);
+				break;
 		}
 		return regIndexToString(this.resReg) + " = fcmp " + llvmCond + " " + typeFlagsToLlvmType(ts.TypeFlags.Number) + " " + regIndexToString(this.leftReg) + ", " +  regIndexToString(this.rightReg);
 	}

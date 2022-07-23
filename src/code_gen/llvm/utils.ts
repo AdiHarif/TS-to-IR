@@ -29,7 +29,7 @@ export function typeFlagsToLlvmType(typeFlags: ts.TypeFlags): string {
 	if (typeFlags & ts.TypeFlags.Boolean) {
 		return 'i1';
 	}
-	return 'unsupported-type(' + ts.TypeFlags[typeFlags] + ')';
+	throw new Error(`unsupported type: ${ts.TypeFlags[typeFlags]}`);
 }
 
 export function regIndexToString(reg: number): string {

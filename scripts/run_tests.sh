@@ -57,6 +57,7 @@ run_test() {
 }
 
 run_all_tests() {
+	time (
 	pushd $TESTS_DIR
 
 	for dir in * ; do
@@ -68,6 +69,7 @@ run_all_tests() {
 	popd
 
 	echo "All tests passed!"
+	)
 }
 
 run_all_tests

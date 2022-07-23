@@ -6,6 +6,7 @@ import * as inst from "./llvm/instructions"
 import * as cg_utils from "./code_gen_utils"
 import * as llvm_utils from "./llvm/utils"
 import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation, emitNegationInstruction, emitLoadVariable, emitPostfixIncrement } from "./llvm/emit"
+import { TlsOptions } from "tls"
 
 class ExpressionSynthesizedContext {
 	static readonly emptyContext = new ExpressionSynthesizedContext([], []);
@@ -49,18 +50,37 @@ function processNewExpression(newExp: ts.NewExpression): number {
 }
 
 function processAssignmentExpression(exp: ts.BinaryExpression): number {
-	//TODO: rename local variables
-	let rightReg = processExpression(exp.right);
-	let leftReg: number;
+	let valueReg = processExpression(exp.right);
+	let addressReg: number;
 	if (exp.left.kind == ts.SyntaxKind.Identifier) {
-		leftReg = cgm.symbolTable.get((exp.left as ts.Identifier).getText())!;
+		addressReg = cgm.symbolTable.get((exp.left as ts.Identifier).getText())!;
 	}
 	else {
 		//TODO: add assertion of the property access being a property and not function
-		leftReg = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
+		addressReg = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
 	}
-	cgm.iBuff.emit(new inst.StoreInstruction(leftReg, rightReg, cgm.checker.getTypeAtLocation(exp.right)));
-	return rightReg;
+	cgm.iBuff.emit(new inst.StoreInstruction(addressReg, valueReg, cgm.checker.getTypeAtLocation(exp.right)));
+	return valueReg;
+}
+
+//TODO: merge with processAssignmentExpression
+function processCompoundAssignment(exp: ts.BinaryExpression): number {
+	const type = cgm.checker.getTypeAtLocation(exp.left);
+	let rightExpressionReg = processExpression(exp.right);
+	let addressReg: number;
+	if (exp.left.kind == ts.SyntaxKind.Identifier) {
+		addressReg = cgm.symbolTable.get((exp.left as ts.Identifier).getText())!;
+	}
+	else {
+		//TODO: add assertion of the property access being a property and not function
+		addressReg = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
+	}
+	const oldValueReg = emitLoadVariable(addressReg, type);
+	const newValueReg = cgm.iBuff.getNewReg();
+	const numericOperator = cg_utils.compoundAssignmentOperatorToNumericOperator(exp.operatorToken.kind as ts.CompoundAssignmentOperator);
+	cgm.iBuff.emit(new inst.NumericOpInstruction(newValueReg, oldValueReg, rightExpressionReg, numericOperator));
+	cgm.iBuff.emit(new inst.StoreInstruction(addressReg, newValueReg, type));
+	return newValueReg;
 }
 
 export function processExpression(exp: ts.Expression): number {
@@ -114,8 +134,11 @@ function processNumericLiteral(numericLiteral: ts.NumericLiteral): number {
 
 function processBinaryExpression(binaryExpression: ts.BinaryExpression): number {
 	const typeFlags = cgm.checker.getTypeAtLocation(binaryExpression).flags;
-	if ((binaryExpression as ts.BinaryExpression).operatorToken.kind == ts.SyntaxKind.EqualsToken) {
+	if (binaryExpression.operatorToken.kind == ts.SyntaxKind.EqualsToken) {
 		return processAssignmentExpression(binaryExpression as ts.BinaryExpression);
+	}
+	else if (cg_utils.isCompoundAssignmentOperator(binaryExpression.operatorToken.kind)) {
+		return processCompoundAssignment(binaryExpression);
 	}
 	else if (typeFlags & ts.TypeFlags.Number) {
 		return processArithmeticBinaryExpression(binaryExpression as ts.BinaryExpression);

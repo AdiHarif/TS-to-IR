@@ -10,7 +10,7 @@ function iterFib(n: number): number {
 	}
 	let prev1: number = 0;
 	let prev2: number = 1;
-	for (let i: number = 0; i <= n; i++) {
+	for (let i: number = 2; i <= n; i++) {
 		let current: number = prev1 + prev2;
 		prev1 = prev2;
 		prev2 = current;

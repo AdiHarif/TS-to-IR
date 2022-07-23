@@ -16,7 +16,7 @@ export let importedFunctionsNodes: ts.PropertyAccessExpression[];
 export let checker: ts.TypeChecker;
 export let printer: ts.Printer;
 export let iBuff: ib.InstructionBuffer;
-export let regMap: Map<string, number>;
+export let symbolTable: Map<string, number>;
 export let irOutputPath: string;
 export let wrapperOutputPath: string;
 
@@ -30,7 +30,7 @@ export function InitManager(sourceFile: string, outputDir: string): void {
 	checker = program.getTypeChecker();
 	printer = ts.createPrinter();
 	iBuff = new ib.InstructionBuffer();
-	regMap = new Map<string, number>();
+	symbolTable = new Map<string, number>();
 
 	const fileName: string = path.parse(sourceFile).name;
 	irOutputPath = path.join(outputDir, `${fileName}.llvm`);

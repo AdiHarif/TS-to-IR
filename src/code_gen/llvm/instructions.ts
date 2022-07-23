@@ -339,6 +339,18 @@ export class LabelInstruction implements Instruction {
 	}
 }
 
+export class BranchInstruction implements PatchableInstruction {
+	constructor(private label: number = -1) {};
+
+	patch(label: number) {
+		this.label = label;
+	}
+
+	toLlvm(): string {
+		return `br label ${labelIndexToString(this.label)}`;
+	}
+}
+
 export class ConditionalBranchInstruction implements PatchableInstruction {
 	private boolReg:number;
 	private trueLabel:number;
@@ -400,6 +412,14 @@ export class PtrToIntInstruction implements Instruction {
 
 	toLlvm(): string {
 		return regIndexToString(this.dstReg) + " = ptrtoint " + typeToLlvmType(this.srcType, true) + " " + regIndexToString(this.srcReg) + " to i32";
+	}
+}
+
+export class StaticAllocationInstruction implements Instruction {
+	constructor(private reg: number, private type: ts.Type) {};
+
+	toLlvm(): string {
+		return `${regIndexToString(this.reg)} = alloca ${typeToLlvmType(this.type)}`;
 	}
 }
 

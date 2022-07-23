@@ -9,7 +9,7 @@ import * as wg from "./ts/wrapper_gen"
 import * as cg_utils from "./code_gen_utils"
 import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts/ts_templates";
 import { emitObjectFieldGetter, emitObjectFieldSetter, emitObjectAllocationFunctionDefinition } from "./llvm/llvm_templates"
-import { emitFunctionDefinition } from "./llvm/emit"
+import { emitFunctionDefinition, emitStaticAllocation } from "./llvm/emit"
 import { processExpression, processBooleanBinaryExpression } from "./expressions"
 
 class StatementSynthesizedContext {
@@ -110,7 +110,7 @@ function processConstructorDeclaration(constructorDecleration: ts.ConstructorDec
 	let ctorRetReg: number = 0;
 	ctorRetReg = cgm.iBuff.getNewReg();
 	cgm.iBuff.emit(new inst.ObjectAllocationInstruction(ctorRetReg, classType));
-	cgm.regMap.set('this', ctorRetReg);
+	cgm.symbolTable.set('this', ctorRetReg);
 	constructorDecleration.body!.statements.forEach(processStatement);
 	cgm.iBuff.emit(new inst.ReturnInstruction(classType, ctorRetReg));
 	cgm.iBuff.emit(new inst.FunctionEndInstruction());
@@ -135,10 +135,10 @@ function processMethodDeclaration(methodDeclaration: ts.MethodDeclaration, class
 function processFunctionDeclaration(functionDecleration: ts.FunctionDeclaration): ts.Statement {
 	const signature = cgm.checker.getSignatureFromDeclaration(functionDecleration)!;
 	let paramTypes: ts.Type[] = [];
-	cgm.regMap.clear();
+	cgm.symbolTable.clear();
 	for (let i = 0; i < signature.parameters.length; i++) {
 		const paramSymbol = signature.parameters[i];
-		cgm.regMap.set(paramSymbol.getName(), -(i + 1)); //TODO: find an elegant representations of function arguments
+		cgm.symbolTable.set(paramSymbol.getName(), -(i + 1)); //TODO: find an elegant representations of function arguments
 		paramTypes.push(cg_utils.getSymbolTypeFlags(paramSymbol));
 	}
 
@@ -178,6 +178,9 @@ function processStatement(st: ts.Statement): StatementSynthesizedContext {
 		case ts.SyntaxKind.IfStatement:
 			statementContext = processIfStatement(st as ts.IfStatement);
 			break;
+		case ts.SyntaxKind.ForStatement:
+			statementContext = processForStatement(st as ts.ForStatement);
+			break;
 		default:
 			throw new Error(`unsupported statement kind: ${ts.SyntaxKind[st.kind]}`);
 			break;
@@ -190,9 +193,12 @@ function processVariableDeclerationsList(list: ts.VariableDeclarationList): void
 	list.declarations.forEach(variableDecleration => {
 		if (variableDecleration.initializer) {
 			//TODO: handle boolean values
-			let resultReg: number = processExpression(variableDecleration.initializer);
+			const type = cgm.checker.getTypeAtLocation(variableDecleration);
+			const variableAdressReg = emitStaticAllocation(type);
 			let variableName: string = variableDecleration.name.getText();
-			cgm.regMap.set(variableName, resultReg);
+			cgm.symbolTable.set(variableName, variableAdressReg);
+			let initializerRer: number = processExpression(variableDecleration.initializer);
+			cgm.iBuff.emit(new inst.StoreInstruction(variableAdressReg, initializerRer, type));
 		}
 	});
 }
@@ -245,4 +251,45 @@ function processIfStatement(ifStatement: ts.IfStatement): StatementSynthesizedCo
 	else { //no else statement
 		return new StatementSynthesizedContext([ ...thenContext.nextList, ...expressionContext.falseList ]);
 	}
+}
+
+function processForStatement(forStatement: ts.ForStatement): StatementSynthesizedContext {
+	let initializerEndBranch: inst.BranchInstruction | undefined;
+	if (forStatement.initializer) {
+		//TODO: replace with processForInitializer and handle expression initializer
+		processVariableDeclerationsList(forStatement.initializer as ts.VariableDeclarationList);
+		initializerEndBranch = new inst.BranchInstruction();
+		cgm.iBuff.emit(initializerEndBranch);
+	}
+
+	const conditionLabel = cgm.iBuff.emitNewLabel();
+	if (initializerEndBranch) {
+		initializerEndBranch.patch(conditionLabel);
+	}
+	/**
+	 * assumption:
+	 * - there is always a condition expression.
+	 * - the condition is a boolean binary expression.
+	 */
+	const conditionContext = processBooleanBinaryExpression(forStatement.condition as ts.BinaryExpression);
+
+	const bodyLabel = cgm.iBuff.emitNewLabel();
+	conditionContext.patchTrueList(bodyLabel);
+	const bodyContext = processStatement(forStatement.statement);
+	const bodyEndBranch = new inst.BranchInstruction();
+	cgm.iBuff.emit(bodyEndBranch);
+
+	// * assumption - there is an incrementor
+	/**
+	 * assumption:
+	 * - there is an incrementor.
+	 * - the incrementor is not a boolean expression.
+	 */
+	const incrementorLabel = cgm.iBuff.emitNewLabel();
+	bodyEndBranch.patch(incrementorLabel);
+	bodyContext.patchNextList(incrementorLabel);
+	processExpression(forStatement.incrementor!);
+	cgm.iBuff.emit(new inst.BranchInstruction(conditionLabel));
+
+	return new StatementSynthesizedContext(conditionContext.falseList);
 }

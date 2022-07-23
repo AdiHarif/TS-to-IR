@@ -5,7 +5,7 @@ import * as cgm from "./manager.js"
 import * as inst from "./llvm/instructions"
 import * as cg_utils from "./code_gen_utils"
 import * as llvm_utils from "./llvm/utils"
-import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation, emitNegationInstruction } from "./llvm/emit"
+import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation, emitNegationInstruction, emitLoadVariable } from "./llvm/emit"
 import { emit } from "process"
 
 class ExpressionSynthesizedContext {
@@ -50,22 +50,30 @@ function processNewExpression(newExp: ts.NewExpression): number {
 }
 
 function processAssignmentExpression(exp: ts.BinaryExpression): number {
+	//TODO: rename local variables
 	let rightReg = processExpression(exp.right);
+	let leftReg: number;
 	if (exp.left.kind == ts.SyntaxKind.Identifier) {
-		cgm.regMap.set((exp.left as ts.Identifier).getText(), rightReg);
+		leftReg = cgm.symbolTable.get((exp.left as ts.Identifier).getText())!;
 	}
 	else {
 		//TODO: add assertion of the property access being a property and not function
-		let leftReg = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
-		cgm.iBuff.emit(new inst.StoreInstruction(leftReg, rightReg, cgm.checker.getTypeAtLocation(exp.right)));
+		leftReg = emitGetPropertyAddress(exp.left as ts.PropertyAccessExpression);
 	}
+	cgm.iBuff.emit(new inst.StoreInstruction(leftReg, rightReg, cgm.checker.getTypeAtLocation(exp.right)));
 	return rightReg;
 }
 
 export function processExpression(exp: ts.Expression): number {
 	switch (exp.kind) {
 		case ts.SyntaxKind.Identifier:
-			return cgm.regMap.get((exp as ts.Identifier).getText())!;
+			//TODO: replace with processIdentifier
+			const addressReg = cgm.symbolTable.get((exp as ts.Identifier).getText())!;
+			if (addressReg > 0) { //i.e its a local variable
+				const type = cgm.checker.getTypeAtLocation(exp);
+				return emitLoadVariable(addressReg, type);
+			}
+			return addressReg;
 			break;
 		case ts.SyntaxKind.NumericLiteral:
 			return processNumericLiteral(exp as ts.NumericLiteral);
@@ -136,7 +144,7 @@ function processCallExpression(callExpression: ts.CallExpression): number {
 
 	if (cg_utils.isMethodCall(callExpression)) {
 		let objType: ts.Type = cgm.checker.getTypeAtLocation((callExpression.expression as ts.PropertyAccessExpression).expression);
-		paramRegs.push({ reg: cgm.regMap.get('this')!, type: objType})
+		paramRegs.push({ reg: cgm.symbolTable.get('this')!, type: objType})
 	}
 
 	if (imported && (cgm.importedFunctions.indexOf(funcName) == -1) ) {

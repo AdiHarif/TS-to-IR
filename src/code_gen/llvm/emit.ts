@@ -11,10 +11,10 @@ import * as cg_utils from "../code_gen_utils"
 export function emitFunctionDefinition(fun: ts.FunctionLikeDeclaration, cls?: ts.Type): void {
 	const signature = cgm.checker.getSignatureFromDeclaration(fun)!;
 	let paramTypes: ts.Type[] = [];
-	cgm.regMap.clear();
+	cgm.symbolTable.clear();
 	for (let i = 0; i < signature.parameters.length; i++) {
 		const paramSymbol = signature.parameters[i];
-		cgm.regMap.set(paramSymbol.getName(), -(i + 1)); //TODO: find an elegant representations of function arguments
+		cgm.symbolTable.set(paramSymbol.getName(), -(i + 1)); //TODO: find an elegant representations of function arguments
 		paramTypes.push(cg_utils.getSymbolTypeFlags(paramSymbol));
 	}
 	let id: string;
@@ -33,7 +33,7 @@ export function emitFunctionDefinition(fun: ts.FunctionLikeDeclaration, cls?: ts
 		if (fun.kind != ts.SyntaxKind.Constructor) {
 			paramTypes.push(cls);
 		}
-		cgm.regMap.set('this', -(signature.parameters.length + 1));
+		cgm.symbolTable.set('this', -(signature.parameters.length + 1));
 	}
 	cgm.iBuff.emit(new inst.FunctionDefinitionInstruction(id, retType, paramTypes));
 }
@@ -61,10 +61,10 @@ export function emitGetPropertyAddress(exp: ts.PropertyAccessExpression): number
 	let objPropNames = cgm.checker.getPropertiesOfType(objType).filter(sym => sym.flags == ts.SymbolFlags.Property).map(sym => sym.getName());
 	let propIndex: number = objPropNames.indexOf(exp.name.getText());
 	if (exp.expression.kind == ts.SyntaxKind.ThisKeyword) {
-		objReg = cgm.regMap.get('this')!;
+		objReg = cgm.symbolTable.get('this')!;
 	}
 	else {
-		objReg = cgm.regMap.get((exp.expression as ts.Identifier).getText())!;
+		objReg = cgm.symbolTable.get((exp.expression as ts.Identifier).getText())!;
 	}
 	cgm.iBuff.emit(new inst.GetElementInstruction(ptrReg, objReg, objType, propIndex))
 	return ptrReg;
@@ -81,5 +81,17 @@ export function emitLoadProperty(exp: ts.PropertyAccessExpression): number {
 export function emitNegationInstruction(argReg: number): number {
 	const resReg = cgm.iBuff.getNewReg();
 	cgm.iBuff.emit(new inst.NegationInstruction(resReg, argReg));
+	return resReg;
+}
+
+export function emitStaticAllocation(type: ts.Type): number {
+	const resReg = cgm.iBuff.getNewReg();
+	cgm.iBuff.emit(new inst.StaticAllocationInstruction(resReg, type));
+	return resReg;
+}
+
+export function emitLoadVariable(addressReg: number, type: ts.Type): number {
+	const resReg = cgm.iBuff.getNewReg();
+	cgm.iBuff.emit(new inst.LoadInstruction(addressReg, resReg, type));
 	return resReg;
 }

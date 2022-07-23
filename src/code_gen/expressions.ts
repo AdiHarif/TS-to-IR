@@ -5,8 +5,7 @@ import * as cgm from "./manager.js"
 import * as inst from "./llvm/instructions"
 import * as cg_utils from "./code_gen_utils"
 import * as llvm_utils from "./llvm/utils"
-import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation, emitNegationInstruction, emitLoadVariable } from "./llvm/emit"
-import { emit } from "process"
+import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation, emitNegationInstruction, emitLoadVariable, emitPostfixIncrement } from "./llvm/emit"
 
 class ExpressionSynthesizedContext {
 	static readonly emptyContext = new ExpressionSynthesizedContext([], []);
@@ -97,6 +96,8 @@ export function processExpression(exp: ts.Expression): number {
 		case ts.SyntaxKind.PrefixUnaryExpression:
 			return processPrefixUnaryExpression(exp as ts.PrefixUnaryExpression);
 			break;
+		case ts.SyntaxKind.PostfixUnaryExpression:
+			return processPostfixUnaryExpression(exp as ts.PostfixUnaryExpression);
 		default:
 			throw new Error(`unsupported expression kind: ${ts.SyntaxKind[exp.kind]}`);
 			break;
@@ -179,5 +180,16 @@ function processPrefixUnaryExpression(prefixUnaryExpression: ts.PrefixUnaryExpre
 			break;
 		default:
 			throw new Error(`unsupported prefixUnaryOperator: ${ts.SyntaxKind[prefixUnaryExpression.operator]}`);
+	}
+}
+
+function processPostfixUnaryExpression(postfixExpression: ts.PostfixUnaryExpression): number {
+	// * assumption - operand is always an identifier.
+	switch (postfixExpression.operator) {
+		case ts.SyntaxKind.PlusPlusToken:
+			return emitPostfixIncrement((postfixExpression.operand as ts.Identifier));
+			break;
+		default:
+			throw new Error(`unsupported postfixUnaryOperator: ${ts.SyntaxKind[postfixExpression.operator]}`);
 	}
 }

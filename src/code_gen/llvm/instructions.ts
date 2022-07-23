@@ -96,6 +96,14 @@ export class NumericAssignmentInstruction implements Instruction {
 	}
 }
 
+export class IncrementInstruction implements Instruction {
+	constructor(private resReg: number, private valueReg: number) {};
+
+	toLlvm(): string {
+		return `${regIndexToString(this.resReg)} = fadd ${typeFlagsToLlvmType(ts.TypeFlags.Number)} 1.0, ${regIndexToString(this.valueReg)}`
+	}
+}
+
 export class NumericOpInstruction implements Instruction {
 	private resReg: number;
 	private leftReg: number;

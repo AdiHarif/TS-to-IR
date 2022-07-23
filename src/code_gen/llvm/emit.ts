@@ -95,3 +95,20 @@ export function emitLoadVariable(addressReg: number, type: ts.Type): number {
 	cgm.iBuff.emit(new inst.LoadInstruction(addressReg, resReg, type));
 	return resReg;
 }
+
+export function emitIncrement(valueReg: number): number {
+	const resReg = cgm.iBuff.getNewReg();
+	cgm.iBuff.emit(new inst.IncrementInstruction(resReg, valueReg));
+	return resReg;
+}
+
+export function emitPostfixIncrement(expression: ts.Identifier): number {
+	// * assumption - operand is always an identifier.
+	const type = cgm.checker.getTypeAtLocation(expression);
+	const varName = (expression as ts.Identifier).getText();
+	const addressReg = cgm.symbolTable.get(varName)!;
+	const valueReg = emitLoadVariable(addressReg, type);
+	const incrementedReg = emitIncrement(valueReg);
+	cgm.iBuff.emit(new inst.StoreInstruction(addressReg, incrementedReg, type));
+	return addressReg;
+}

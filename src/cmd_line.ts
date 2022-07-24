@@ -2,7 +2,7 @@
 import * as cmd from "ts-command-line-args";
 
 interface CommandLineArguments {
-	sourceFile: string,
+	sourceFiles: Array<string>,
 	outputFolder: string,
 };
 
@@ -11,7 +11,7 @@ interface CommandLineArguments {
 
 export function parseCommandLineArgs(): CommandLineArguments {
 	return cmd.parse<CommandLineArguments>({
-		sourceFile: { type: String, defaultOption: true },
+		sourceFiles: { type: String, multiple: true, defaultOption: true },
 		outputFolder: { type: String, alias: 'o', defaultValue: 'out' },
 	});
 }

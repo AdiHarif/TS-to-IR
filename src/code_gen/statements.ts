@@ -1,6 +1,7 @@
 
 import * as ts from "typescript"
 import { writeFileSync } from "fs"
+import * as path from "node:path"
 import { cloneNode } from "ts-clone-node"
 
 import * as cgm from "./manager.js"
@@ -28,14 +29,15 @@ class StatementSynthesizedContext {
 
 export function processProgram(): void {
 
-	const sourceFile = cgm.getSourceFile();
+	const sourceFiles = cgm.getSourceFiles();
 
-	const wrapperSourceFile = processSourceFile(sourceFile);
-
+	sourceFiles.forEach(file => {
+		const wrapperSourceFile = processSourceFile(file);
+		const wrapperPath = path.join(cgm.outputDirPath, path.basename(file.fileName));
+		writeFileSync(wrapperPath, cgm.printer.printFile(wrapperSourceFile));
+	})
 	const outCode = cgm.iBuff.dumpBuffer();
 	writeFileSync(cgm.irOutputPath, outCode);
-
-	writeFileSync(cgm.wrapperOutputPath, cgm.printer.printFile(wrapperSourceFile));
 }
 
 function processSourceFile(file: ts.SourceFile): ts.SourceFile {

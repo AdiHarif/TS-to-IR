@@ -5,7 +5,7 @@ import * as cmd from "./cmd_line"
 
 function main(): void {
 	const args = cmd.parseCommandLineArgs();
-	cgm.InitManager(args.sourceFile, args.outputFolder);
+	cgm.InitManager(args.sourceFiles, args.outputFolder);
 	processProgram();
 }
 

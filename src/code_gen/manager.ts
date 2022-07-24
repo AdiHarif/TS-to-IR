@@ -5,7 +5,6 @@ import * as path from "node:path"
 import * as ib from "./llvm/instruction_buffer.js"
 
 let program: ts.Program;
-let sourceFilePath: string;
 
 //TODO: find a more suitable place for this list.
 export let importedFunctions: string[];
@@ -18,33 +17,32 @@ export let printer: ts.Printer;
 export let iBuff: ib.InstructionBuffer;
 export let symbolTable: Map<string, number>;
 export let irOutputPath: string;
-export let wrapperOutputPath: string;
+export let outputDirPath: string;
 
-export function InitManager(sourceFile: string, outputDir: string): void {
+export function InitManager(sourceFiles: string[], outputDir: string): void {
 	const options: ts.CompilerOptions = {
 	};
-	program = ts.createProgram([ sourceFile ] , options); //TODO: add compiler options handling
+	program = ts.createProgram( sourceFiles , options); //TODO: add compiler options handling
 	//TODO: check if the programs syntax\semantics are ok
 
-	sourceFilePath = sourceFile;
 	checker = program.getTypeChecker();
 	printer = ts.createPrinter();
 	iBuff = new ib.InstructionBuffer();
 	symbolTable = new Map<string, number>();
+	outputDirPath = outputDir;
 
-	const fileName: string = path.parse(sourceFile).name;
-	irOutputPath = path.join(outputDir, `${fileName}.llvm`);
-	const fileBase: string = path.parse(sourceFile).base;
-	wrapperOutputPath = path.join(outputDir, fileBase);
+	//TODO: get name from cmd args
+	irOutputPath = path.join(outputDir, `module.llvm`);
 
 	importedFunctions = [];
 	importedFunctionsNodes = [];
 }
 
-export function getSourceFile(): ts.SourceFile {
-	return program.getSourceFiles().filter(sf => !sf.isDeclarationFile)[0];
+export function getSourceFiles(): ts.SourceFile[] {
+	return program.getSourceFiles().filter(sf => !sf.isDeclarationFile);
 }
 
 export function getWasmFileName(): string {
-	return `${path.parse(sourceFilePath).name}.wasm`
+	//TODO: get from cmd args
+	return `module.wasm`;
 }

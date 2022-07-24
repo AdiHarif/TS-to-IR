@@ -388,9 +388,9 @@ export class ConditionalBranchInstruction implements PatchableInstruction {
 
 export class StructDefinitionInstruction implements Instruction {
 	private name: string;
-	private typesList: ts.TypeFlags[];
+	private typesList: ts.Type[];
 
-	constructor(name: string, typesList: ts.TypeFlags[]) {
+	constructor(name: string, typesList: ts.Type[]) {
 		this.name = name;
 		this.typesList = typesList;
 	}
@@ -398,7 +398,7 @@ export class StructDefinitionInstruction implements Instruction {
 	toLlvm(): string {
 		let out = '%' + this.name + ' = type {\n'
 		for (let i = 0; i < this.typesList.length; i++) {
-			out += '\t' + typeFlagsToLlvmType(this.typesList[i]);
+			out += '\t' + typeToLlvmType(this.typesList[i], true);
 			if (i != this.typesList.length - 1) {
 				out += ",";
 			}

@@ -132,6 +132,7 @@ export function createWrapTwinObjectDeclaration(type: ts.Type): ts.MethodDeclara
 							'twinObj',
 							ts.factory.createIdentifier('obj')
 						),
+						//TODO: change spread assignment to regular assignment to __proto__
 						ts.factory.createSpreadAssignment(ts.factory.createCallExpression(
 							ts.factory.createPropertyAccessExpression(
 								ts.factory.createIdentifier('Object'),

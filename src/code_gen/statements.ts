@@ -78,7 +78,7 @@ function processClassDecleration(classDeclaration: ts.ClassDeclaration): ts.Stat
 		emitObjectFieldGetter(type, properties[i], propTypes[i], i);
 		emitObjectFieldSetter(type, properties[i], propTypes[i], i);
 	}
-	cgm.iBuff.emitStructDefinition(new inst.StructDefinitionInstruction(symbol.name, propTypeFlags));
+	cgm.iBuff.emitStructDefinition(new inst.StructDefinitionInstruction(symbol.name, propTypes));
 	emitObjectAllocationFunctionDefinition(type);
 	let wrapperClassMembers: ts.ClassElement[] = []
 	classDeclaration.forEachChild(child => {

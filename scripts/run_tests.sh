@@ -23,8 +23,8 @@ run_test() {
 	pushd $test_name
 
 	source_file="$test_name.ts"
-	llvm_file="$test_name.llvm"
-	wasm_file="$test_name.wasm"
+	llvm_file="module.llvm"
+	wasm_file="module.wasm"
 	prelink_wasm_file="prelink_$wasm_file"
 	test_out_dir="test_out"
 	mkdir $test_out_dir

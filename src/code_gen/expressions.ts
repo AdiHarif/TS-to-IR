@@ -8,8 +8,8 @@ import * as llvm_utils from "./llvm/utils"
 import { emitFunctionCall, emitGetPropertyAddress, emitLoadProperty, emitBinaryBooleanOperation, emitNegationInstruction, emitLoadVariable, emitPostfixIncrement } from "./llvm/emit"
 import { TlsOptions } from "tls"
 
-class ExpressionSynthesizedContext {
-	static readonly emptyContext = new ExpressionSynthesizedContext([], []);
+class BooleanExpressionSynthesizedContext {
+	static readonly emptyContext = new BooleanExpressionSynthesizedContext([], []);
 
 	constructor(readonly trueList: inst.BackpatchEntry[], readonly falseList: inst.BackpatchEntry[]) {};
 
@@ -181,7 +181,7 @@ function processCallExpression(callExpression: ts.CallExpression): number {
 	return emitFunctionCall(retType, funcName, paramRegs);
 }
 
-export function processBooleanBinaryExpression(binaryExpression: ts.BinaryExpression): ExpressionSynthesizedContext {
+export function processBooleanBinaryExpression(binaryExpression: ts.BinaryExpression): BooleanExpressionSynthesizedContext {
 	const leftReg: number = processExpression(binaryExpression.left);
 	const rightReg: number = processExpression(binaryExpression.right);
 	const resReg: number = emitBinaryBooleanOperation(leftReg, rightReg, binaryExpression.operatorToken.kind);
@@ -189,7 +189,7 @@ export function processBooleanBinaryExpression(binaryExpression: ts.BinaryExpres
 	cgm.iBuff.emit(branchInstruction);
 	const trueEntry = new inst.BackpatchEntry(branchInstruction, 0);
 	const falseEntry = new inst.BackpatchEntry(branchInstruction, 1);
-	return new ExpressionSynthesizedContext([ trueEntry ], [ falseEntry ]);
+	return new BooleanExpressionSynthesizedContext([ trueEntry ], [ falseEntry ]);
 }
 
 function processPrefixUnaryExpression(prefixUnaryExpression: ts.PrefixUnaryExpression): number {
@@ -215,4 +215,8 @@ function processPostfixUnaryExpression(postfixExpression: ts.PostfixUnaryExpress
 		default:
 			throw new Error(`unsupported postfixUnaryOperator: ${ts.SyntaxKind[postfixExpression.operator]}`);
 	}
+}
+
+function processLeftHandSideExpression(leftHandSideExpression: ts.LeftHandSideExpression) {
+
 }

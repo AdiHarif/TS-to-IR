@@ -303,9 +303,16 @@ function processIdentifier(identifier: ts.Identifier): ExpressionContext {
 			irName: identifier.text
 		};
 	}
-	else if (symbol.flags & (ts.SymbolFlags.Method | ts.SymbolFlags.Function)) {
+	else if (symbol.flags & ts.SymbolFlags.Function) {
 		return {
 			kind: ExpressionContextKind.Function,
+			irName: identifier.text
+		};
+
+	}
+	else if (symbol.flags & ts.SymbolFlags.Method) {
+		return {
+			kind: ExpressionContextKind.Method,
 			irName: identifier.text
 		};
 

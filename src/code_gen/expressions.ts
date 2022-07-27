@@ -356,7 +356,6 @@ function processPropertyAccessExpression(propertyAccessExpression: ts.PropertyAc
 			};
 			break;
 		case ExpressionContextKind.Property:
-			assert(expressionContext.kind == ExpressionContextKind.Address);
 			const propertyAddressReg = emitGetPropertyAddress(expressionContext.reg!, expressionContext.type!, nameContext.irName!);
 			return {
 				kind: ExpressionContextKind.Address,

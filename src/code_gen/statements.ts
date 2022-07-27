@@ -11,7 +11,7 @@ import * as cg_utils from "./code_gen_utils"
 import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts/ts_templates";
 import { emitObjectFieldGetter, emitObjectFieldSetter, emitObjectAllocationFunctionDefinition } from "./llvm/llvm_templates"
 import { emitFunctionDefinition, emitStaticAllocation } from "./llvm/emit"
-import { processExpression, processBooleanBinaryExpression } from "./expressions"
+import { processExpression, processBooleanBinaryExpression, expressionContextToValueReg } from "./expressions"
 
 class StatementSynthesizedContext {
 	static readonly emptyContext = new StatementSynthesizedContext([]);
@@ -199,8 +199,9 @@ function processVariableDeclerationsList(list: ts.VariableDeclarationList): void
 			const variableAdressReg = emitStaticAllocation(type);
 			let variableName: string = variableDecleration.name.getText();
 			cgm.symbolTable.set(variableName, variableAdressReg);
-			let initializerRer: number = processExpression(variableDecleration.initializer);
-			cgm.iBuff.emit(new inst.StoreInstruction(variableAdressReg, initializerRer, type));
+			let initializerContext = processExpression(variableDecleration.initializer);
+			const initializerValueReg = expressionContextToValueReg(initializerContext, type);
+			cgm.iBuff.emit(new inst.StoreInstruction(variableAdressReg, initializerValueReg, type));
 		}
 	});
 }
@@ -209,9 +210,10 @@ function processReturnStatement(returnStatement: ts.ReturnStatement): void {
 	let retInst: inst.ReturnInstruction;
 	if (returnStatement.expression) {
 		//TODO: handle boolean values
-		let resultReg: number = processExpression(returnStatement.expression);
 		let retType = cgm.checker.getTypeAtLocation(returnStatement.expression);
-		retInst = new inst.ReturnInstruction(retType, resultReg);
+		let expressionContext = processExpression(returnStatement.expression);
+		const retValueReg = expressionContextToValueReg(expressionContext, retType);
+		retInst = new inst.ReturnInstruction(retType, retValueReg);
 	}
 	else {
 		retInst = new inst.ReturnInstruction(null);

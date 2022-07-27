@@ -8,14 +8,14 @@ export function typeToLlvmType(type: ts.Type | null, forceObjPtr: boolean = fals
 	if (type == null) {
 		return typeFlagsToLlvmType(ts.TypeFlags.Void);
 	}
-	if (type.isClass() || type.flags & ts.TypeFlags.TypeParameter) {
+	if (type.flags & ts.TypeFlags.Object || type.flags & ts.TypeFlags.TypeParameter) {
 		let out = '%' + type.symbol.getName();
 		if (forceObjPtr) {
 			out += '*';
 		}
 		return out;
 	}
-	return typeFlagsToLlvmType(type.getFlags());
+	return typeFlagsToLlvmType(type.flags);
 }
 
 export function typeFlagsToLlvmType(typeFlags: ts.TypeFlags): string {

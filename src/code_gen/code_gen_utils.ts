@@ -51,3 +51,13 @@ export function compoundAssignmentOperatorToNumericOperator(op: ts.CompoundAssig
 			throw new Error(`unsupported CompoundAssignmentOperator: ${ts.SyntaxKind[op]}`);
 	}
 }
+
+export function numberType() {
+	return {
+		flags: ts.TypeFlags.Number
+	} as ts.Type;
+}
+
+export function isFunctionArgument(identifier: ts.Identifier): boolean {
+	return (cgm.symbolTable.get(identifier.text)! < 0);
+}

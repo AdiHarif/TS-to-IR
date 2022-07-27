@@ -54,29 +54,22 @@ export function emitFunctionCall(retType: ts.Type | null, name: string, paramReg
 	return retReg.reg;
 }
 
-export function emitGetPropertyAddress(exp: ts.PropertyAccessExpression): number {
-	let ptrReg: number = cgm.iBuff.getNewReg();
-	let objReg: number;
-	let objType: ts.Type = cgm.checker.getTypeAtLocation(exp.expression);
+export function emitGetPropertyAddress(objAddressReg: number, objType: ts.Type, propertyName: string): number {
+	let propertyAddresReg: number = cgm.iBuff.getNewReg();
 	let objPropNames = cgm.checker.getPropertiesOfType(objType).filter(sym => sym.flags == ts.SymbolFlags.Property).map(sym => sym.getName());
-	let propIndex: number = objPropNames.indexOf(exp.name.getText());
-	if (exp.expression.kind == ts.SyntaxKind.ThisKeyword) {
-		objReg = cgm.symbolTable.get('this')!;
-	}
-	else {
-		objReg = cgm.symbolTable.get((exp.expression as ts.Identifier).getText())!;
-	}
-	cgm.iBuff.emit(new inst.GetElementInstruction(ptrReg, objReg, objType, propIndex))
-	return ptrReg;
+	let propIndex: number = objPropNames.indexOf(propertyName);
+
+	cgm.iBuff.emit(new inst.GetElementInstruction(propertyAddresReg, objAddressReg, objType, propIndex))
+	return propertyAddresReg;
 }
 
-export function emitLoadProperty(exp: ts.PropertyAccessExpression): number {
-	let addressReg = emitGetPropertyAddress(exp);
-	let resReg = cgm.iBuff.getNewReg();
-	let valType: ts.Type = cgm.checker.getTypeAtLocation(exp);
-	cgm.iBuff.emit(new inst.LoadInstruction(addressReg, resReg, valType))
-	return resReg;
-}
+// export function emitLoadProperty(exp: ts.PropertyAccessExpression): number {
+// 	let addressReg = emitGetPropertyAddress(exp);
+// 	let resReg = cgm.iBuff.getNewReg();
+// 	let valType: ts.Type = cgm.checker.getTypeAtLocation(exp);
+// 	cgm.iBuff.emit(new inst.LoadInstruction(addressReg, resReg, valType))
+// 	return resReg;
+// }
 
 export function emitNegationInstruction(argReg: number): number {
 	const resReg = cgm.iBuff.getNewReg();
@@ -102,11 +95,8 @@ export function emitIncrement(valueReg: number): number {
 	return resReg;
 }
 
-export function emitPostfixIncrement(expression: ts.Identifier): number {
-	// * assumption - operand is always an identifier.
-	const type = cgm.checker.getTypeAtLocation(expression);
-	const varName = (expression as ts.Identifier).getText();
-	const addressReg = cgm.symbolTable.get(varName)!;
+export function emitPostfixIncrement(addressReg: number): number {
+	const type = cg_utils.numberType();
 	const valueReg = emitLoadVariable(addressReg, type);
 	const incrementedReg = emitIncrement(valueReg);
 	cgm.iBuff.emit(new inst.StoreInstruction(addressReg, incrementedReg, type));

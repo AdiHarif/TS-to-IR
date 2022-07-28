@@ -1,4 +1,5 @@
 
+import { stat } from "fs";
 import * as ts from "typescript";
 
 import * as cgm from "./manager.js"
@@ -60,4 +61,18 @@ export function numberType() {
 
 export function isFunctionArgument(identifier: ts.Identifier): boolean {
 	return (cgm.symbolTable.get(identifier.text)! < 0);
+}
+
+export function getAllInterfaceNames(sourceFiles: ts.SourceFile[]): string[] {
+	let interfaceNames: string[] = [];
+	sourceFiles.forEach(file => {
+		file.statements.forEach(statement => {
+			if ((statement.kind == ts.SyntaxKind.ClassDeclaration) ||
+			    (statement.kind == ts.SyntaxKind.InterfaceDeclaration)) {
+
+				interfaceNames.push((statement as ts.DeclarationStatement).name!.text);
+			}
+		});
+	});
+	return interfaceNames;
 }

@@ -15,7 +15,7 @@ export enum ExpressionContextKind {
 	Property,
 	Function,
 	Method,
-	ImportedNamespace
+	ImportedInterface
 };
 
 export interface ExpressionContext {
@@ -297,17 +297,18 @@ function processPostfixUnaryExpression(postfixExpression: ts.PostfixUnaryExpress
 function processIdentifier(identifier: ts.Identifier): ExpressionContext {
 	const symbol: ts.Symbol = cgm.checker.getSymbolAtLocation(identifier)!;
 	const type: ts.Type = cgm.checker.getTypeAtLocation(identifier);
-	if (symbol.flags & ts.SymbolFlags.Function) {
+	if (symbol.flags & (ts.SymbolFlags.Function | ts.SymbolFlags.Method)) {
 		return {
 			kind: ExpressionContextKind.Function,
 			irName: identifier.text
 		};
 	}
-	else if (symbol.flags & ts.SymbolFlags.Method) {
+	else if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface)) {
+		assert(cgm.localInterfaces.indexOf(symbol.name) == -1);
 		return {
-			kind: ExpressionContextKind.Method,
+			kind: ExpressionContextKind.ImportedInterface,
 			irName: identifier.text
-		};
+		}
 	}
 	else if (symbol.flags & ts.SymbolFlags.Variable) {
 		const kind = cg_utils.isFunctionArgument(identifier) ?  ExpressionContextKind.Value : ExpressionContextKind.Address;
@@ -324,10 +325,7 @@ function processIdentifier(identifier: ts.Identifier): ExpressionContext {
 		}
 	}
 	else {
-		return {
-			kind: ExpressionContextKind.ImportedNamespace,
-			irName: identifier.text
-		};
+		throw new Error(`unsupported SymbolFlags: ${ts.SymbolFlags[symbol.flags]}`);
 	}
 }
 
@@ -335,22 +333,26 @@ function processPropertyAccessExpression(propertyAccessExpression: ts.PropertyAc
 	const expressionContext = processExpression(propertyAccessExpression.expression);
 	const nameContext = processIdentifier(propertyAccessExpression.name as ts.Identifier);
 	const type = cgm.checker.getTypeAtLocation(propertyAccessExpression);
+
 	switch (nameContext.kind) {
 		case ExpressionContextKind.Function:
-			assert(expressionContext.kind == ExpressionContextKind.ImportedNamespace);
-			return {
-				kind: ExpressionContextKind.Function,
-				irName: `${expressionContext.irName!}_${nameContext.irName!}`,
-				isImported: true
-			};
-			break;
-		case ExpressionContextKind.Method:
-			assert(expressionContext.kind == ExpressionContextKind.Address);
-			return {
-				kind: ExpressionContextKind.Method,
-				reg: expressionContext.reg!,
-				irName: expressionContext.irName!
-			};
+			if (expressionContext.kind == ExpressionContextKind.Address) {
+				return {
+					kind: ExpressionContextKind.Method,
+					irName: `${cgm.checker.typeToString(expressionContext.type!)}_${nameContext.irName!}`,
+					reg: expressionContext.reg!
+				};
+			}
+			else if (expressionContext.kind == ExpressionContextKind.ImportedInterface) {
+				return {
+					kind: ExpressionContextKind.Function,
+					irName: `${expressionContext.irName!}_${nameContext.irName!}`,
+					isImported: true
+				};
+			}
+			else {
+				throw new Error(`unsupported expression's ExpressionContextKind: ${ExpressionContextKind[expressionContext.kind]}`);
+			}
 			break;
 		case ExpressionContextKind.Property:
 			const propertyAddressReg = emitGetPropertyAddress(expressionContext.reg!, expressionContext.type!, nameContext.irName!);

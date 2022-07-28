@@ -3,6 +3,7 @@ import * as ts from "typescript";
 import * as path from "node:path"
 
 import * as ib from "./llvm/instruction_buffer.js"
+import * as cg_utils from "./code_gen_utils"
 
 let program: ts.Program;
 
@@ -18,6 +19,7 @@ export let iBuff: ib.InstructionBuffer;
 export let symbolTable: Map<string, number>;
 export let irOutputPath: string;
 export let outputDirPath: string;
+export let localInterfaces: string[];
 
 export function InitManager(sourceFiles: string[], outputDir: string): void {
 	const options: ts.CompilerOptions = {
@@ -36,6 +38,8 @@ export function InitManager(sourceFiles: string[], outputDir: string): void {
 
 	importedFunctions = [];
 	importedFunctionsNodes = [];
+
+	localInterfaces = cg_utils.getAllInterfaceNames(getSourceFiles());
 }
 
 export function getSourceFiles(): ts.SourceFile[] {

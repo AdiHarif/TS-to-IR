@@ -1,7 +1,7 @@
 
 import * as ts from "typescript";
 
-import { typeToLlvmType, typeFlagsToLlvmType, regIndexToString, labelIndexToString } from "./utils.js"
+import { typeToLlvmType, typeFlagsToLlvmType, regIndexToString, labelIndexToString } from "./llvm_utils.js"
 
 export type TypedReg = {
 	reg: number;

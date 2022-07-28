@@ -2,7 +2,7 @@
 import * as ts from 'typescript'
 
 import * as cgm from '../manager.js'
-import { methodDeclarationToIrName } from '../llvm/utils';
+import { methodDeclarationToIrName } from '../llvm/llvm_utils';
 import * as talt from "talt"
 import { cloneNode } from 'ts-clone-node';
 

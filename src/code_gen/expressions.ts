@@ -15,7 +15,7 @@ export enum ExpressionContextKind {
 	Property,
 	Function,
 	Method,
-	Namespace
+	ImportedNamespace
 };
 
 export interface ExpressionContext {
@@ -297,25 +297,17 @@ function processPostfixUnaryExpression(postfixExpression: ts.PostfixUnaryExpress
 function processIdentifier(identifier: ts.Identifier): ExpressionContext {
 	const symbol: ts.Symbol = cgm.checker.getSymbolAtLocation(identifier)!;
 	const type: ts.Type = cgm.checker.getTypeAtLocation(identifier);
-	if (symbol.flags & ts.SymbolFlags.Namespace) {
-		return {
-			kind: ExpressionContextKind.Namespace,
-			irName: identifier.text
-		};
-	}
-	else if (symbol.flags & ts.SymbolFlags.Function) {
+	if (symbol.flags & ts.SymbolFlags.Function) {
 		return {
 			kind: ExpressionContextKind.Function,
 			irName: identifier.text
 		};
-
 	}
 	else if (symbol.flags & ts.SymbolFlags.Method) {
 		return {
 			kind: ExpressionContextKind.Method,
 			irName: identifier.text
 		};
-
 	}
 	else if (symbol.flags & ts.SymbolFlags.Variable) {
 		const kind = cg_utils.isFunctionArgument(identifier) ?  ExpressionContextKind.Value : ExpressionContextKind.Address;
@@ -331,7 +323,12 @@ function processIdentifier(identifier: ts.Identifier): ExpressionContext {
 			irName: identifier.text,
 		}
 	}
-	throw new Error(`unsupported SymbolFlags: ${symbol.flags}`);
+	else {
+		return {
+			kind: ExpressionContextKind.ImportedNamespace,
+			irName: identifier.text
+		};
+	}
 }
 
 function processPropertyAccessExpression(propertyAccessExpression: ts.PropertyAccessExpression): ExpressionContext {
@@ -340,13 +337,13 @@ function processPropertyAccessExpression(propertyAccessExpression: ts.PropertyAc
 	const type = cgm.checker.getTypeAtLocation(propertyAccessExpression);
 	switch (nameContext.kind) {
 		case ExpressionContextKind.Function:
-			assert(expressionContext.kind == ExpressionContextKind.Namespace);
+			assert(expressionContext.kind == ExpressionContextKind.ImportedNamespace);
 			return {
 				kind: ExpressionContextKind.Function,
-				irName: `${expressionContext.irName!}_${nameContext.irName!}`
+				irName: `${expressionContext.irName!}_${nameContext.irName!}`,
+				isImported: true
 			};
 			break;
-
 		case ExpressionContextKind.Method:
 			assert(expressionContext.kind == ExpressionContextKind.Address);
 			return {

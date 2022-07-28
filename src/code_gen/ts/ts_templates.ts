@@ -2,7 +2,7 @@
 import * as ts from "typescript"
 import * as talt from "talt"
 
-import { expressionIrName } from "../llvm/utils";
+import { expressionIrName } from "../llvm/llvm_utils";
 import * as cgm from "../manager"
 
 export function createLoadModuleDeclaration(moduleName: string, imports: ts.PropertyAccessExpression[]): ts.FunctionDeclaration {

@@ -8,7 +8,7 @@ import * as cgm from "./manager.js"
 import * as inst from "./llvm/instructions"
 import * as wg from "./ts/wrapper_gen"
 import * as cg_utils from "./code_gen_utils"
-import { createLoadModuleStatements, createWrapTwinObjectDeclaration } from "./ts/ts_templates";
+import { createModuleLoaderSourceFile, createWrapTwinObjectDeclaration } from "./ts/ts_templates";
 import { emitObjectFieldGetter, emitObjectFieldSetter, emitObjectAllocationFunctionDefinition } from "./llvm/llvm_templates"
 import { emitFunctionDefinition, emitStaticAllocation } from "./llvm/emit"
 import { processExpression, processBooleanBinaryExpression, expressionContextToValueReg } from "./expressions"
@@ -38,10 +38,14 @@ export function processProgram(): void {
 	})
 	const outCode = cgm.iBuff.dumpBuffer();
 	writeFileSync(cgm.irOutputPath, outCode);
+
+	const loadModuleSourceFile = createModuleLoaderSourceFile();
+	//TODO: replace explicit file name here
+	writeFileSync(`${cgm.outputDirPath}/wasm_loader.ts`, cgm.printer.printFile(loadModuleSourceFile));
 }
 
 function processSourceFile(file: ts.SourceFile): ts.SourceFile {
-	let wrapperFileStatements: ts.Statement[] = [];
+	let wrapperFileStatements: ts.Statement[] = [ wg.createModuleLoaderImportStatement() ];
 
 	file.statements.forEach(st => {
 		let wrapperStatement: ts.Statement;
@@ -59,7 +63,6 @@ function processSourceFile(file: ts.SourceFile): ts.SourceFile {
 		}
 		wrapperFileStatements.push(wrapperStatement);
 	});
-	wrapperFileStatements.splice(0, 0, ...createLoadModuleStatements(cgm.getWasmFileName(), cgm.importedFunctionsNodes));
 	return wg.createWrapperSourceFile(wrapperFileStatements);
 }
 

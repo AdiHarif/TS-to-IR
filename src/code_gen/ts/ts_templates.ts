@@ -5,7 +5,7 @@ import * as talt from "talt"
 import { expressionIrName } from "../llvm/llvm_utils";
 import * as cgm from "../manager"
 
-export function createLoadModuleDeclaration(moduleName: string, imports: ts.PropertyAccessExpression[]): ts.FunctionDeclaration {
+export function createLoadModuleDeclaration(imports: ts.PropertyAccessExpression[]): ts.FunctionDeclaration {
 
 	const importsObjectLiteral: ts.ObjectLiteralExpression = ts.factory.createObjectLiteralExpression(
 		imports.map((exp) => {
@@ -47,7 +47,7 @@ export function createLoadModuleDeclaration(moduleName: string, imports: ts.Prop
 	`();
 
 	const moduleExportsAssignment = talt.template.statement`
-		moduleExports = instance.exports;
+		return instance.exports;
 	`();
 
 	// talt doesnt support instantiating templates with if statements at the moment
@@ -73,34 +73,17 @@ export function createLoadModuleDeclaration(moduleName: string, imports: ts.Prop
 }
 
 
-export function createLoadModuleStatements(moduleName: string, imports: ts.PropertyAccessExpression[]): ts.Statement[] {
+export function createLoadModuleStatements(imports: ts.PropertyAccessExpression[]): ts.Statement[] {
 
-	let moduleExportsVariableStatement = ts.factory.createVariableStatement(
-		undefined,
-		[ts.factory.createVariableDeclaration(
-			'moduleExports',
-			undefined,
-			ts.factory.createTypeReferenceNode(ts.factory.createQualifiedName(
-				ts.factory.createIdentifier('WebAssembly'),
-				ts.factory.createIdentifier('Exports')
-			))
-		)]
-	);
+	const moduleExportsVariableStatement = talt.template.statement(
+		`export const moduleExports = await loadModule();`
+	)();
 
-	let loadModuleFunctionDecleration = createLoadModuleDeclaration(moduleName, imports);
-
-	let loadModuleCallStatement = ts.factory.createExpressionStatement(ts.factory.createAwaitExpression(
-		ts.factory.createCallExpression(
-			ts.factory.createIdentifier('loadModule'),
-			undefined,
-			undefined
-		)
-	));
+	const loadModuleFunctionDecleration = createLoadModuleDeclaration(imports);
 
 	return [
-		moduleExportsVariableStatement,
 		loadModuleFunctionDecleration,
-		loadModuleCallStatement
+		moduleExportsVariableStatement
 	];
 }
 
@@ -152,3 +135,12 @@ export function createWrapTwinObjectDeclaration(type: ts.Type): ts.MethodDeclara
 
 	return wrapTwinObjectDeclaration;
 }
+
+export function createModuleLoaderSourceFile(): ts.SourceFile {
+	return ts.factory.createSourceFile(
+		createLoadModuleStatements(cgm.importedFunctionsNodes),
+		ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
+		ts.NodeFlags.None
+	);
+}
+

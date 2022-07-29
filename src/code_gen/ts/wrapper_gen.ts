@@ -2,9 +2,8 @@
 import * as ts from 'typescript'
 
 import * as cgm from '../manager.js'
-import { methodDeclarationToIrName } from '../llvm/llvm_utils';
+import { methodDeclarationToIrName, typeFlagsToLlvmType } from '../llvm/llvm_utils';
 import * as talt from "talt"
-import { cloneNode } from 'ts-clone-node';
 
 export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.MethodDeclaration {
 
@@ -282,4 +281,10 @@ export function createWrapperFunctionDeclaration(functionDeclaration: ts.Functio
 	)
 
 	return wrapperFunctionDeclaration;
+}
+
+export function createModuleLoaderImportStatement(): ts.Statement {
+	return talt.template.statement`
+		import { moduleExports } from './wasm_loader.js'
+	`();
 }

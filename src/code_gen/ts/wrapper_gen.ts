@@ -22,8 +22,7 @@ export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.M
 			...decl.parameters.map((param) => {
 				let paramName: string = param.name.getText();
 				let paramType: ts.Type = cgm.checker.getTypeAtLocation(param);
-				let paramTypeName: string = cgm.checker.typeToString(paramType);
-				if (paramTypeName == className) {
+				if (paramType.flags & ts.TypeFlags.Object) {
 					return ts.factory.createPropertyAccessExpression(
 						ts.factory.createIdentifier(paramName),
 						'twinObj'
@@ -41,11 +40,11 @@ export function createWrapperMethodDeclaration(decl: ts.MethodDeclaration): ts.M
 	let bodyStatement: ts.Statement;
 	let retType: ts.Type = cgm.checker.getReturnTypeOfSignature(cgm.checker.getSignatureFromDeclaration(decl)!);
 	if (!(retType.getFlags() & ts.TypeFlags.Void)) {
-		let retTypeName: string = cgm.checker.typeToString(retType);
-		if (retTypeName == className) {
+		if (retType.flags & ts.TypeFlags.Object) {
+			let retTypeName: string = cgm.checker.typeToString(retType);
 			bodyCallExpression = ts.factory.createCallExpression(
 				ts.factory.createPropertyAccessExpression(
-					ts.factory.createIdentifier(className),
+					ts.factory.createIdentifier(retTypeName),
 					'wrapTwinObject'
 				),
 				undefined,
@@ -139,7 +138,7 @@ export function createWrapperClassDecleration(className: string, members: ts.Cla
 
 	let twinObjPropertyDecleration = ts.factory.createPropertyDeclaration(
 		undefined,
-		[ ts.factory.createToken(ts.SyntaxKind.PrivateKeyword) ],
+		[ ts.factory.createToken(ts.SyntaxKind.PublicKeyword) ],
 		'twinObj',
 		undefined,
 		ts.factory.createTypeReferenceNode('number'),
@@ -166,20 +165,26 @@ export function createWrapperGetter(decl: ts.PropertyDeclaration): ts.AccessorDe
 	let propName: string = decl.name.getText();
 	let wasmGetterName: string = `get_${propName}_${decl.parent.name!.getText()}`;
 
-	let bodyStatement = ts.factory.createReturnStatement(ts.factory.createCallExpression(
-		ts.factory.createParenthesizedExpression(ts.factory.createAsExpression(
-			ts.factory.createPropertyAccessExpression(
-				ts.factory.createIdentifier('moduleExports'),
-				wasmGetterName
-			),
-			ts.factory.createTypeReferenceNode('Function')
-		)),
-		undefined,
-		[ ts.factory.createPropertyAccessExpression(
-			ts.factory.createToken(ts.SyntaxKind.ThisKeyword),
-			'twinObj'
-		)]
-	));
+	const callExpression = talt.template.expression(
+		`(moduleExports.${wasmGetterName} as Function)(this.twinObj)`
+	)();
+
+	let returnStatementTemplate;
+	let type = cgm.checker.getTypeFromTypeNode(decl.type!);
+	if (type.flags & ts.TypeFlags.Object) {
+		const typeName = cgm.checker.typeToString(type);
+		returnStatementTemplate = talt.template.statement(
+			`return ${typeName}.wrapTwinObject(CALL_EXPRESSION);`
+		);
+	}
+	else {
+		returnStatementTemplate = talt.template.statement(
+			`return CALL_EXPRESSION;`
+		);
+	}
+	const returnStatement = returnStatementTemplate({
+		CALL_EXPRESSION: callExpression
+	});
 
 	let wrapperGetter = ts.factory.createGetAccessorDeclaration(
 		undefined,
@@ -188,7 +193,7 @@ export function createWrapperGetter(decl: ts.PropertyDeclaration): ts.AccessorDe
 		[],
 		ts.factory.createTypeReferenceNode(decl.type!.getText()),
 		ts.factory.createBlock(
-			[ bodyStatement ],
+			[ returnStatement ],
 			true
 		)
 	);
@@ -201,23 +206,20 @@ export function createWrapperSetter(decl: ts.PropertyDeclaration): ts.AccessorDe
 	let propName: string = decl.name.getText();
 	let wasmSetterName: string = `set_${propName}_${decl.parent.name!.getText()}`;
 
-	let bodyStatement = ts.factory.createExpressionStatement(ts.factory.createCallExpression(
-		ts.factory.createParenthesizedExpression(ts.factory.createAsExpression(
-			ts.factory.createPropertyAccessExpression(
-				ts.factory.createIdentifier('moduleExports'),
-				wasmSetterName
-			),
-			ts.factory.createTypeReferenceNode('Function')
-		)),
-		undefined,
-		[
-			ts.factory.createIdentifier(propName),
-			ts.factory.createPropertyAccessExpression(
-				ts.factory.createToken(ts.SyntaxKind.ThisKeyword),
-				'twinObj'
-			)
-		]
-	));
+	let propetyArgument: ts.Expression;
+	const type = cgm.checker.getTypeFromTypeNode(decl.type!);
+	if (type.flags & ts.TypeFlags.Object) {
+		propetyArgument = talt.template.expression(`${propName}.twinObj`)();
+	}
+	else {
+		propetyArgument = talt.template.expression(propName)();
+	}
+
+	const bodyStatement = talt.template.statement(
+		`(moduleExports.${wasmSetterName} as Function)(PROPERTY_ARGUMENT, this.twinObj);`
+	)({
+		PROPERTY_ARGUMENT: propetyArgument
+	});
 
 	let wrapperSetter = ts.factory.createSetAccessorDeclaration(
 		undefined,

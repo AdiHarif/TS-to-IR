@@ -281,7 +281,7 @@ export class StoreInstruction implements Instruction {
 
 
 	toLlvm(): string {
-		return 'store ' + typeToLlvmType(this.valueType) + ' ' + regIndexToString(this.valueReg) + ', ' + typeToLlvmType(this.valueType) + '* ' + regIndexToString(this.addressReg);
+		return 'store ' + typeToLlvmType(this.valueType, true) + ' ' + regIndexToString(this.valueReg) + ', ' + typeToLlvmType(this.valueType, true) + '* ' + regIndexToString(this.addressReg);
 	}
 }
 
@@ -297,7 +297,7 @@ export class LoadInstruction implements Instruction {
 	}
 
 	toLlvm(): string {
-		let llvmType = typeToLlvmType(this.valueType);
+		let llvmType = typeToLlvmType(this.valueType, true);
 		return regIndexToString(this.valueReg) + ' = load ' + llvmType + ', ' + llvmType + '* ' + regIndexToString(this.addressReg);
 	}
 }

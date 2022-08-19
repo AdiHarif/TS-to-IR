@@ -339,7 +339,7 @@ function processPropertyAccessExpression(propertyAccessExpression: ts.PropertyAc
 			if (expressionContext.kind == ExpressionContextKind.LValue || expressionContext.kind == ExpressionContextKind.RValue) {
 				return {
 					kind: ExpressionContextKind.Method,
-					irName: `${cgm.checker.typeToString(expressionContext.type!)}_${nameContext.irName!}`,
+					irName: `${expressionContext.type!.symbol.getName()}_${nameContext.irName!}`,
 					reg: expressionContextToRValueReg(expressionContext, expressionContext.type!)
 				};
 			}

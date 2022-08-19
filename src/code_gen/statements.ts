@@ -11,7 +11,7 @@ import * as cg_utils from "./code_gen_utils"
 import { createModuleLoaderSourceFile, createWrapTwinObjectDeclaration } from "./ts/ts_templates";
 import { emitObjectFieldGetter, emitObjectFieldSetter, emitObjectAllocationFunctionDefinition } from "./llvm/llvm_templates"
 import { emitFunctionDefinition, emitStaticAllocation } from "./llvm/emit"
-import { processExpression, processBooleanBinaryExpression, expressionContextToValueReg } from "./expressions"
+import { processExpression, processBooleanBinaryExpression, expressionContextToRValueReg } from "./expressions"
 
 class StatementSynthesizedContext {
 	static readonly emptyContext = new StatementSynthesizedContext([]);
@@ -203,7 +203,7 @@ function processVariableDeclerationsList(list: ts.VariableDeclarationList): void
 			let variableName: string = variableDecleration.name.getText();
 			cgm.symbolTable.set(variableName, variableAdressReg);
 			let initializerContext = processExpression(variableDecleration.initializer);
-			const initializerValueReg = expressionContextToValueReg(initializerContext, type);
+			const initializerValueReg = expressionContextToRValueReg(initializerContext, type);
 			cgm.iBuff.emit(new inst.StoreInstruction(variableAdressReg, initializerValueReg, type));
 		}
 	});
@@ -215,7 +215,7 @@ function processReturnStatement(returnStatement: ts.ReturnStatement): void {
 		//TODO: handle boolean values
 		let retType = cgm.checker.getTypeAtLocation(returnStatement.expression);
 		let expressionContext = processExpression(returnStatement.expression);
-		const retValueReg = expressionContextToValueReg(expressionContext, retType);
+		const retValueReg = expressionContextToRValueReg(expressionContext, retType);
 		retInst = new inst.ReturnInstruction(retType, retValueReg);
 	}
 	else {

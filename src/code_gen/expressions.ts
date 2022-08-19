@@ -10,8 +10,8 @@ import { assert } from "console"
 
 export enum ExpressionContextKind {
 	Empty,
-	Value,
-	Address,
+	RValue,
+	LValue,
 	Property,
 	Function,
 	Method,
@@ -41,11 +41,11 @@ export class BooleanExpressionSynthesizedContext {
 	}
 }
 
-export function expressionContextToValueReg(context: ExpressionContext, type: ts.Type): number {
-	if (context.kind == ExpressionContextKind.Value) {
+export function expressionContextToRValueReg(context: ExpressionContext, type: ts.Type): number {
+	if (context.kind == ExpressionContextKind.RValue) {
 		return context.reg!;
 	}
-	else if (context.kind == ExpressionContextKind.Address) {
+	else if (context.kind == ExpressionContextKind.LValue) {
 		return emitLoadVariable(context.reg!, type);
 	}
 	else {
@@ -53,8 +53,8 @@ export function expressionContextToValueReg(context: ExpressionContext, type: ts
 	}
 }
 
-function assertAddressContext(context: ExpressionContext): void {
-	if (context.kind != ExpressionContextKind.Address) {
+function assertLValueContext(context: ExpressionContext): void {
+	if (context.kind != ExpressionContextKind.LValue) {
 		throw new Error(`unsupported ExpressionContexKind: ${ExpressionContextKind[context.kind]}`);
 	}
 }
@@ -69,15 +69,15 @@ function assertCallableContext(context: ExpressionContext): void {
 function processArithmeticBinaryExpression(exp: ts.BinaryExpression): ExpressionContext {
 	const type = cgm.checker.getTypeAtLocation(exp);
 	const leftContext = processExpression(exp.left);
-	const leftValueReg = expressionContextToValueReg(leftContext, type);
+	const leftValueReg = expressionContextToRValueReg(leftContext, type);
 	const rightContext = processExpression(exp.right);
-	const rightValueReg = expressionContextToValueReg(rightContext, type);
+	const rightValueReg = expressionContextToRValueReg(rightContext, type);
 
 	const resReg = cgm.iBuff.getNewReg();
 	//TODO: wrap this emit with an emitter function
 	cgm.iBuff.emit(new inst.NumericOpInstruction(resReg, leftValueReg, rightValueReg, exp.operatorToken.kind));
 	return {
-		kind: ExpressionContextKind.Value,
+		kind: ExpressionContextKind.RValue,
 		reg: resReg
 	};
 }
@@ -92,14 +92,14 @@ function processNewExpression(newExp: ts.NewExpression): ExpressionContext {
 			argType = cgm.checker.getContextualType(exp)!;
 		}
 		const expressionContext = processExpression(exp);
-		const argValueReg = expressionContextToValueReg(expressionContext, argType);
+		const argValueReg = expressionContextToRValueReg(expressionContext, argType);
 		paramRegs.push({
 			reg: argValueReg, type: argType
 		});
 	});
 	let funcName: string = objType.getSymbol()!.getName() + '_constructor'
 	return {
-		kind: ExpressionContextKind.Value,
+		kind: ExpressionContextKind.RValue,
 		reg: emitFunctionCall(objType, funcName, paramRegs)
 	};
 }
@@ -107,14 +107,14 @@ function processNewExpression(newExp: ts.NewExpression): ExpressionContext {
 function processAssignmentExpression(exp: ts.BinaryExpression): ExpressionContext {
 	const type = cgm.checker.getTypeAtLocation(exp.right);
 	const rightContext = processExpression(exp.right);
-	let rightValueReg: number = expressionContextToValueReg(rightContext, type);
+	let rightValueReg: number = expressionContextToRValueReg(rightContext, type);
 
 	const leftContext = processExpression(exp.left);
-	assertAddressContext(leftContext);
+	assertLValueContext(leftContext);
 
 	cgm.iBuff.emit(new inst.StoreInstruction(leftContext.reg!, rightValueReg, type));
 	return {
-		kind: ExpressionContextKind.Value,
+		kind: ExpressionContextKind.RValue,
 		reg: rightValueReg
 	};
 }
@@ -123,10 +123,10 @@ function processAssignmentExpression(exp: ts.BinaryExpression): ExpressionContex
 function processCompoundAssignment(exp: ts.BinaryExpression): ExpressionContext {
 	const type = cgm.checker.getTypeAtLocation(exp.left);
 	const rightContext = processExpression(exp.right);
-	const rightValueReg = expressionContextToValueReg(rightContext, type);
+	const rightValueReg = expressionContextToRValueReg(rightContext, type);
 
 	const leftContext = processExpression(exp.left)
-	assertAddressContext(leftContext);
+	assertLValueContext(leftContext);
 
 	let addressReg: number = leftContext.reg!;
 	const oldValueReg = emitLoadVariable(addressReg, type);
@@ -135,7 +135,7 @@ function processCompoundAssignment(exp: ts.BinaryExpression): ExpressionContext 
 	cgm.iBuff.emit(new inst.NumericOpInstruction(newValueReg, oldValueReg, rightValueReg, numericOperator));
 	cgm.iBuff.emit(new inst.StoreInstruction(addressReg, newValueReg, type));
 	return {
-		kind: ExpressionContextKind.Value,
+		kind: ExpressionContextKind.RValue,
 		reg: newValueReg
 	};
 }
@@ -183,7 +183,7 @@ function processNumericLiteral(numericLiteral: ts.NumericLiteral): ExpressionCon
 	const reg = cgm.iBuff.getNewReg();
 	cgm.iBuff.emit(new inst.NumericAssignmentInstruction(reg, val));
 	return {
-		kind: ExpressionContextKind.Value,
+		kind: ExpressionContextKind.RValue,
 		reg: reg
 	};
 }
@@ -213,7 +213,7 @@ function processCallExpression(callExpression: ts.CallExpression): ExpressionCon
 			argType = cgm.checker.getContextualType(exp)!;
 		}
 		const argContext = processExpression(exp);
-		const valueReg = expressionContextToValueReg(argContext, argType);
+		const valueReg = expressionContextToRValueReg(argContext, argType);
 		paramRegs.push({
 			reg: valueReg, type: argType
 		});
@@ -240,16 +240,16 @@ function processCallExpression(callExpression: ts.CallExpression): ExpressionCon
 
 	const resultReg = emitFunctionCall(retType, functionName, paramRegs);
 	return {
-		kind: ExpressionContextKind.Value,
+		kind: ExpressionContextKind.RValue,
 		reg: resultReg
 	};
 }
 
 export function processBooleanBinaryExpression(binaryExpression: ts.BinaryExpression): BooleanExpressionSynthesizedContext {
 	const leftContext = processExpression(binaryExpression.left);
-	const leftReg = expressionContextToValueReg(leftContext, cg_utils.numberType());
+	const leftReg = expressionContextToRValueReg(leftContext, cg_utils.numberType());
 	const rightContext = processExpression(binaryExpression.right);
-	const rightReg = expressionContextToValueReg(rightContext, cg_utils.numberType());
+	const rightReg = expressionContextToRValueReg(rightContext, cg_utils.numberType());
 	const resReg: number = emitBinaryBooleanOperation(leftReg, rightReg, binaryExpression.operatorToken.kind);
 	//TODO: move branch emitting to if statement
 	const branchInstruction = new inst.ConditionalBranchInstruction(resReg);
@@ -263,10 +263,10 @@ function processPrefixUnaryExpression(prefixUnaryExpression: ts.PrefixUnaryExpre
 	switch (prefixUnaryExpression.operator) {
 		case ts.SyntaxKind.MinusToken:
 			const expContext = processExpression(prefixUnaryExpression.operand);
-			const expValueReg = expressionContextToValueReg(expContext, cg_utils.numberType());
+			const expValueReg = expressionContextToRValueReg(expContext, cg_utils.numberType());
 			const newValueReg = emitNegationInstruction(expValueReg);
 			return {
-				kind: ExpressionContextKind.Value,
+				kind: ExpressionContextKind.RValue,
 				reg: newValueReg
 			};
 			break;
@@ -277,13 +277,13 @@ function processPrefixUnaryExpression(prefixUnaryExpression: ts.PrefixUnaryExpre
 
 function processPostfixUnaryExpression(postfixExpression: ts.PostfixUnaryExpression): ExpressionContext {
 	const operandContext = processExpression(postfixExpression.operand);
-	assertAddressContext(operandContext);
+	assertLValueContext(operandContext);
 	let valueReg: number;
 	let contextKind: ExpressionContextKind;
 	switch (postfixExpression.operator) {
 		case ts.SyntaxKind.PlusPlusToken:
 			valueReg = emitPostfixIncrement(operandContext.reg!);
-			contextKind = ExpressionContextKind.Value;
+			contextKind = ExpressionContextKind.RValue;
 			break;
 		default:
 			throw new Error(`unsupported postfixUnaryOperator: ${ts.SyntaxKind[postfixExpression.operator]}`);
@@ -311,7 +311,7 @@ function processIdentifier(identifier: ts.Identifier): ExpressionContext {
 		}
 	}
 	else if (symbol.flags & ts.SymbolFlags.Variable) {
-		const kind = cg_utils.isFunctionArgument(identifier) ?  ExpressionContextKind.Value : ExpressionContextKind.Address;
+		const kind = cg_utils.isFunctionArgument(identifier) ?  ExpressionContextKind.RValue : ExpressionContextKind.LValue;
 		return {
 			kind: kind,
 			reg: cgm.symbolTable.get(identifier.text)!,
@@ -336,11 +336,11 @@ function processPropertyAccessExpression(propertyAccessExpression: ts.PropertyAc
 
 	switch (nameContext.kind) {
 		case ExpressionContextKind.Function:
-			if (expressionContext.kind == ExpressionContextKind.Address) {
+			if (expressionContext.kind == ExpressionContextKind.LValue || expressionContext.kind == ExpressionContextKind.RValue) {
 				return {
 					kind: ExpressionContextKind.Method,
 					irName: `${cgm.checker.typeToString(expressionContext.type!)}_${nameContext.irName!}`,
-					reg: expressionContext.reg!
+					reg: expressionContextToRValueReg(expressionContext, expressionContext.type!)
 				};
 			}
 			else if (expressionContext.kind == ExpressionContextKind.ImportedInterface) {
@@ -357,7 +357,7 @@ function processPropertyAccessExpression(propertyAccessExpression: ts.PropertyAc
 		case ExpressionContextKind.Property:
 			const propertyAddressReg = emitGetPropertyAddress(expressionContext.reg!, expressionContext.type!, nameContext.irName!);
 			return {
-				kind: ExpressionContextKind.Address,
+				kind: ExpressionContextKind.LValue,
 				reg: propertyAddressReg,
 				type: type
 			};
@@ -369,7 +369,7 @@ function processPropertyAccessExpression(propertyAccessExpression: ts.PropertyAc
 
 function processThisExpression(thisExpression: ts.ThisExpression): ExpressionContext {
 	return {
-		kind: ExpressionContextKind.Address,
+		kind: ExpressionContextKind.RValue,
 		reg: cgm.symbolTable.get('this')!,
 		type: cgm.checker.getTypeAtLocation(thisExpression)!
 	};

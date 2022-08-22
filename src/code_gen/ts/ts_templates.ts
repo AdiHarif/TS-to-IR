@@ -4,6 +4,7 @@ import * as talt from "talt"
 
 import { expressionIrName } from "../llvm/llvm_utils";
 import * as cgm from "../manager"
+import { ReturnInstruction } from "../llvm/instructions";
 
 export function createLoadModuleDeclaration(imports: ts.PropertyAccessExpression[]): ts.FunctionDeclaration {
 
@@ -91,6 +92,15 @@ export function createWrapTwinObjectDeclaration(type: ts.Type): ts.MethodDeclara
 
 	const typeName: string = type.getSymbol()!.getName();
 
+	const returnStatement: ts.Statement = talt.template.statement(
+		`
+		return {
+			twinObj: obj,
+			__proto__: ${typeName}.prototype
+		    } as unknown as ${typeName};
+		`
+	)();
+
 	let wrapTwinObjectDeclaration = ts.factory.createMethodDeclaration(
 		undefined,
 		[ ts.factory.createModifier(ts.SyntaxKind.StaticKeyword) ],
@@ -107,30 +117,7 @@ export function createWrapTwinObjectDeclaration(type: ts.Type): ts.MethodDeclara
 			ts.factory.createTypeReferenceNode('number')
 		)],
 		ts.factory.createTypeReferenceNode(typeName),
-		ts.factory.createBlock(
-			[ ts.factory.createReturnStatement(ts.factory.createAsExpression(
-				ts.factory.createObjectLiteralExpression(
-					[
-						ts.factory.createPropertyAssignment(
-							'twinObj',
-							ts.factory.createIdentifier('obj')
-						),
-						//TODO: change spread assignment to regular assignment to __proto__
-						ts.factory.createSpreadAssignment(ts.factory.createCallExpression(
-							ts.factory.createPropertyAccessExpression(
-								ts.factory.createIdentifier('Object'),
-								'getPrototypeOf'
-							),
-							undefined,
-							[ ts.factory.createIdentifier(typeName) ]
-						))
-					],
-					true
-				),
-				ts.factory.createTypeReferenceNode(typeName)
-			))],
-			true
-		)
+		ts.factory.createBlock([ returnStatement ], true)
 	);
 
 	return wrapTwinObjectDeclaration;

@@ -70,11 +70,8 @@ class MyApp extends GraphicsLoop
     }
 }
 
-window.addEventListener("load", () =>
-{
-    cvs = <HTMLCanvasElement>document.getElementById('cvs');
-    myApp = new MyApp(cvs);
+cvs = <HTMLCanvasElement>document.getElementById('cvs');
+myApp = new MyApp(cvs);
 
-    myApp.setMaxAllowedFps(80);
-    myApp.startMainLoop();
-});
+myApp.setMaxAllowedFps(80);
+myApp.startMainLoop();

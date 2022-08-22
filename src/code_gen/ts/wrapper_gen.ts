@@ -106,7 +106,7 @@ export function createWrapperConstructorDeclaration(decl: ts.ConstructorDeclarat
 				let paramName: string = param.name.getText();
 				let paramType: ts.Type = cgm.checker.getTypeAtLocation(param);
 				let paramTypeName: string = cgm.checker.typeToString(paramType);
-				if (paramTypeName == className) {
+				if (paramType.flags & ts.TypeFlags.Object) {
 					return ts.factory.createPropertyAccessExpression(
 						ts.factory.createIdentifier(paramName),
 						'twinObj'

@@ -16,7 +16,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^17.0.23"
+    "@types/node": "^17.0.23",
+    "live-server": "^1.2.2"
   },
   "dependencies": {
     "talt": "^2.3.1",

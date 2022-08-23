@@ -78,10 +78,6 @@ typings/
 # Next.js build output
 .next
 
-# Nuxt.js build / generate output
-.nuxt
-dist
-
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and *not* Next.js
@@ -111,8 +107,8 @@ misc/
 # Test tmp files
 tests/**/test_out/*
 
-res/Fireworks/build/*.js
-res/Fireworks/build/*.js.map
+res/Fireworks/dist/*.js
+res/Fireworks/dist/*.js.map
 
 utils/*.js
 

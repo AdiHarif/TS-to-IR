@@ -21,13 +21,13 @@ check_dependencies() {
 copy_fireworks_source_files() {
 	rm -rf $DEMO_DIR
 
-	mkdir $DEMO_DIR
+	mkdir -p $DEMO_DIR
 	cp $FIREWORKS_DIR/tsconfig.json $DEMO_DIR
 
-	mkdir $DEMO_DIST_DIR
+	mkdir -p $DEMO_DIST_DIR
 	cp $FIREWORKS_DIR/dist/index.html $DEMO_DIST_DIR
 
-	mkdir $DEMO_SRC_DIR
+	mkdir -p $DEMO_SRC_DIR
 	cp \
 		$FIREWORKS_SRC_DIR/app.ts \
 		$FIREWORKS_SRC_DIR/Firework.ts \

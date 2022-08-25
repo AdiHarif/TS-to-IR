@@ -27,7 +27,7 @@ run_test() {
 	wasm_file="module.wasm"
 	prelink_wasm_file="prelink_$wasm_file"
 	test_out_dir="test_out"
-	mkdir $test_out_dir
+	mkdir -p $test_out_dir
 
 	rm -rf $test_out_dir/*
 

@@ -65,7 +65,7 @@ run_demo() {
 	llc --march=wasm32 --filetype=obj $OUT_DIR/module.llvm -o $OUT_DIR/tmp.wasm
 
 	echo "===== Linking wasm module with walloc ====="
-	wasm-ld --export-all --no-entry --allow-undefined $OUT_DIR/tmp.wasm res/walloc/walloc.wasm -o $OUT_DIR/module.wasm
+	wasm-ld --export-all --no-entry --allow-undefined $OUT_DIR/tmp.wasm res/walloc.wasm -o $OUT_DIR/module.wasm
 
 	echo "===== Copying compiled wasm and wrapper files to demo dir ====="
 	copy_out_files_to_demo_dir

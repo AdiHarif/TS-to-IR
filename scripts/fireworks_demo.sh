@@ -58,6 +58,7 @@ run_demo() {
 
 	echo "===== Compiling Vector2D.ts and PartialParticle2D.ts to llvm ir ====="
 	rm -rf ./$OUT_DIR/*
+	mkdir -p $OUT_DIR
 	npm start $FIREWORKS_SRC_DIR/Vector2D.ts $FIREWORKS_SRC_DIR/PartialParticle2D.ts
 
 	echo "===== Compililng llvm module to wasm ====="

@@ -11,7 +11,8 @@
     "test": "scripts/run_tests.sh",
     "build": "tsc",
     "prestart": "npm run build",
-    "start": "node build/app.js"
+    "start": "node build/app.js",
+    "demo": "scripts/fireworks_demo.sh"
   },
   "author": "",
   "license": "ISC",

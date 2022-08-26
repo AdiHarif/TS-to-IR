@@ -1,7 +1,9 @@
 
-# TS to IR
+# TS-to-IR
 
-TS to IR is a tool for compiling TypeScript code to WebAssembly.
+[TS-to-IR](https://github.com/AdiHarif/TS-to-IR) is a tool for compiling TypeScript code to WebAssembly.
+
+Compiling TypeScript files with TS-to-IR creates LLVM IR module containing all their logic, and TypeScript files allowing to import the module's methods in order to use them as part of larger TS projects. In order for the LLVM module to be loaded it has to be compiled to WebAssembly first. this can be done with LLVM static compiler (llc).
 
 ## Install
 
@@ -30,6 +32,7 @@ Use npm to start a fireworks demo on browser with live-server
 ```
 npm run demo
 ```
+For more info on the demo - [Fireworks_Demo.md](https://github.com/AdiHarif/TS-to-IR/blob/main/docs/Fireworks_Demo.md)
 > Note that llvm static compiler (llc command) and llvm based linker (wasm-ld command) must be installed
 
 ## Testing

@@ -1,0 +1,31 @@
+
+name: CI
+
+on:
+  push:
+
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - name: Installing llvm tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install llvm lld-10
+          sudo cp /usr/bin/wasm-ld-10 /usr/bin/wasm-ld
+
+      - name: Install project package
+        run: npm install
+
+      - name: Run tests
+        run: npm run test

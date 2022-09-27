@@ -76,3 +76,13 @@ export function getAllInterfaceNames(sourceFiles: ts.SourceFile[]): string[] {
 	});
 	return interfaceNames;
 }
+
+export function isIrCompileTarget(node: ts.Node): boolean {
+	let flag: boolean = false;
+	ts.getJSDocTags(node).forEach(tag => {
+		if (tag.tagName.getText() == 'ir_compile') {
+			flag = true;
+		}
+	});
+	return flag;
+}

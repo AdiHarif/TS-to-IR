@@ -4,6 +4,7 @@ import * as path from "node:path"
 
 import * as ib from "./llvm/instruction_buffer.js"
 import * as cg_utils from "./code_gen_utils"
+import * as cmd from "../cmd_line"
 
 let program: ts.Program;
 
@@ -18,23 +19,25 @@ export let printer: ts.Printer;
 export let iBuff: ib.InstructionBuffer;
 export let symbolTable: Map<string, number>;
 export let irOutputPath: string;
-export let outputDirPath: string;
 export let localInterfaces: string[];
+export let cmd_args: cmd.CommandLineArguments;
 
-export function InitManager(sourceFiles: string[], outputDir: string): void {
+export function InitManager(args: cmd.CommandLineArguments): void {
+
+	cmd_args = args;
+
 	const options: ts.CompilerOptions = {
 	};
-	program = ts.createProgram( sourceFiles , options); //TODO: add compiler options handling
+	program = ts.createProgram(args.sourceFiles , options); //TODO: add compiler options handling
 	//TODO: check if the programs syntax\semantics are ok
 
 	checker = program.getTypeChecker();
 	printer = ts.createPrinter();
 	iBuff = new ib.InstructionBuffer();
 	symbolTable = new Map<string, number>();
-	outputDirPath = outputDir;
 
 	//TODO: get name from cmd args
-	irOutputPath = path.join(outputDir, `module.llvm`);
+	irOutputPath = path.join(args.outputDir, `module.llvm`);
 
 	importedFunctions = [];
 	importedFunctionsNodes = [];

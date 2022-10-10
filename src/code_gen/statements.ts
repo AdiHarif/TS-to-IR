@@ -33,7 +33,7 @@ export function processProgram(): void {
 
 	sourceFiles.forEach(file => {
 		const wrapperSourceFile = processSourceFile(file);
-		const wrapperPath = path.join(cgm.outputDirPath, path.basename(file.fileName));
+		const wrapperPath = path.join(cgm.cmd_args.outputDir, path.basename(file.fileName));
 		writeFileSync(wrapperPath, cgm.printer.printFile(wrapperSourceFile));
 	})
 	const outCode = cgm.iBuff.dumpBuffer();
@@ -41,7 +41,7 @@ export function processProgram(): void {
 
 	const loadModuleSourceFile = createModuleLoaderSourceFile();
 	//TODO: replace explicit file name here
-	writeFileSync(`${cgm.outputDirPath}/wasm_loader.ts`, cgm.printer.printFile(loadModuleSourceFile));
+	writeFileSync(`${cgm.cmd_args.outputDir}/wasm_loader.ts`, cgm.printer.printFile(loadModuleSourceFile));
 }
 
 function processSourceFile(file: ts.SourceFile): ts.SourceFile {

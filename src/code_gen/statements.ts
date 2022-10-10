@@ -49,17 +49,24 @@ function processSourceFile(file: ts.SourceFile): ts.SourceFile {
 
 	file.statements.forEach(st => {
 		let wrapperStatement: ts.Statement;
-		switch (st.kind) {
-			case ts.SyntaxKind.ClassDeclaration:
-				wrapperStatement = processClassDecleration(st as ts.ClassDeclaration);
-				break;
-			case ts.SyntaxKind.FunctionDeclaration:
-				//TODO: create wrapper function if declaration is exported
-				wrapperStatement = processFunctionDeclaration(st as ts.FunctionDeclaration);
-				break;
-			default:
-				wrapperStatement = cloneNode(st);
-				break;
+
+		if (cgm.cmd_args.partialCompiling && !cg_utils.isIrCompileTarget(st)) {
+			wrapperStatement = cloneNode(st);
+		}
+		else {
+			switch (st.kind) {
+				case ts.SyntaxKind.ClassDeclaration:
+					wrapperStatement = processClassDecleration(st as ts.ClassDeclaration);
+					break;
+				case ts.SyntaxKind.FunctionDeclaration:
+					//TODO: create wrapper function if declaration is exported
+					wrapperStatement = processFunctionDeclaration(st as ts.FunctionDeclaration);
+					break;
+				default:
+					wrapperStatement = cloneNode(st);
+					break;
+			}
+
 		}
 		wrapperFileStatements.push(wrapperStatement);
 	});

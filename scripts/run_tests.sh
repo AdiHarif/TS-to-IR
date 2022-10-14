@@ -5,8 +5,6 @@ source ./scripts/script_utils.sh
 TESTS_DIR="./tests"
 LLVM_UTIL_DIR="../../res"
 
-PROCESSING_COMMAND="node ../../build/app.js"
-
 throw_error() {
 	error_message=$1
 
@@ -32,7 +30,11 @@ run_test() {
 	rm -rf $test_out_dir/*
 
 	echo "Processing $source_file"
-	$PROCESSING_COMMAND $source_file -o $test_out_dir || throw_error "Processing failed"
+	processing_command="node ../../build/app.js"
+	if [ -f "config.json" ]; then
+		processing_command+=" --partialCompiling config.json"
+	fi
+	$processing_command $source_file -o $test_out_dir || throw_error "Processing failed"
 	echo "$source_file precessed successfully"
 
 	pushd $test_out_dir
